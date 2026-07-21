@@ -30,11 +30,14 @@ Homebrew 6 不再接受仓库内的本地 Formula；项目建立独立 Homebrew 
 
 ```bash
 windotp add --default jump1
-windotp add staging
+windotp add jump2
 windotp bind jump1 jump-bj.sensetime.com
-windotp bind staging jump-sh.sensetime.com
+windotp bind jump2 jump-sh.sensetime.com
 windotp list
 ```
+
+`bind` 的第二个参数使用 WindTerm 顶部 tab 显示的名称。以后每增加一台 JumpServer，只需要执行
+一次 `add` 和一次 `bind`，Automator 与快捷键无需修改。
 
 也可以从密码管理器通过 stdin 导入 Base32 或 `otpauth://` URL：
 
@@ -84,7 +87,8 @@ Keychain，因此不适合作为 WindOTP 的入口。
 快速操作和一个快捷键。WindOTP 根据 WindTerm 当前选中 tab 的标签自动匹配 profile，不弹出列表；
 无法唯一匹配时会拒绝输入。
 
-实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。
+实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。在 M5 Mac、WindTerm 和多个 profile
+的实际环境中，从按下快捷键到填写验证码约需 1 秒。
 
 ## WindTerm Trigger 自动填写（可选）
 
@@ -96,8 +100,7 @@ WindTerm 的 Trigger 支持匹配文本后运行外部程序。可创建 session
 - Arguments: `type --delay 200ms jump1`
 
 自动 Trigger 只适合当前登录 session 位于前台的情况。如果多个 tab 同时登录，后台 tab 的
-Trigger 可能在前台 tab 输入验证码；WindOTP 只能确认前台应用是 WindTerm，无法可靠识别当前
-WindTerm tab。因此多 session 环境推荐使用快捷键模式。
+Trigger 可能在前台 tab 输入验证码，因此多 session 环境推荐使用 `windotp auto` 快捷键模式。
 
 ## 命令
 
