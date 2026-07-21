@@ -38,6 +38,20 @@ const frontWindow = windows[0];
 const candidates = [];
 const seen = {};
 let visited = 0;
+let matched = false;
+
+function matchesProfile(value) {
+    if (typeof value !== "string") {
+        return false;
+    }
+    const normalized = value.toLowerCase();
+    for (let i = 0; i < profileMatches.length; i += 1) {
+        if (normalized.indexOf(profileMatches[i].toLowerCase()) !== -1) {
+            return true;
+        }
+    }
+    return false;
+}
 
 function addCandidate(value) {
     if (typeof value !== "string" || value.length === 0 || seen[value]) {
@@ -45,12 +59,23 @@ function addCandidate(value) {
     }
     seen[value] = true;
     candidates.push(value);
+    if (matchesProfile(value)) {
+        matched = true;
+    }
 }
 
-function visit(element, depth) {
-    if (depth > 12 || visited >= 3000) {
-        return;
-    }
+const windowName = safe(() => frontWindow.name(), "");
+if (matchesProfile(windowName)) {
+    matched = true;
+}
+
+const queue = [{element: frontWindow, depth: 0}];
+let cursor = 0;
+while (!matched && cursor < queue.length && visited < 800) {
+    const current = queue[cursor];
+    cursor += 1;
+    const element = current.element;
+    const depth = current.depth;
     visited += 1;
     const role = safe(() => element.role(), "");
     const name = safe(() => element.name(), "");
@@ -64,15 +89,17 @@ function visit(element, depth) {
     if (focused || selected || activeControl) {
         addCandidate(name);
     }
-    const children = safe(() => element.uiElements(), []);
-    for (let i = 0; i < children.length; i += 1) {
-        visit(children[i], depth + 1);
+    const skipChildren = role === "AXTextArea" || role === "AXTable" || role === "AXOutline" || role === "AXWebArea";
+    if (!matched && !skipChildren && depth < 12) {
+        const children = safe(() => element.uiElements(), []);
+        for (let i = 0; i < children.length; i += 1) {
+            queue.push({element: children[i], depth: depth + 1});
+        }
     }
 }
 
-visit(frontWindow, 0);
 JSON.stringify({
-    window: safe(() => frontWindow.name(), ""),
+    window: windowName,
     candidates: candidates
 });`
 
@@ -144,9 +171,13 @@ return item 1 of picked
 	return selected, nil
 }
 
-func platformContext() (FrontContext, error) {
+func platformContext(matches []string) (FrontContext, error) {
+	encodedMatches, err := json.Marshal(matches)
+	if err != nil {
+		return FrontContext{}, fmt.Errorf("encode profile matches: %w", err)
+	}
 	cmd := exec.Command("/usr/bin/osascript", "-l", "JavaScript")
-	cmd.Stdin = bytes.NewBufferString(frontContextScript)
+	cmd.Stdin = bytes.NewBufferString("const profileMatches = " + string(encodedMatches) + ";\n" + frontContextScript)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return FrontContext{}, fmt.Errorf("inspect active WindTerm tab: %s: %w", bytes.TrimSpace(output), err)

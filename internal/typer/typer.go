@@ -27,6 +27,6 @@ func Choose(profiles []string, defaultProfile string) (string, error) {
 	return platformChoose(profiles, defaultProfile)
 }
 
-func Context() (FrontContext, error) {
-	return platformContext()
+func Context(matches []string) (FrontContext, error) {
+	return platformContext(matches)
 }

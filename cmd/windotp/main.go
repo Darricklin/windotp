@@ -342,7 +342,15 @@ func (a app) auto(args []string) error {
 	if err != nil {
 		return err
 	}
-	context, err := typer.Context()
+	matches := make([]string, 0, len(cfg.Profiles))
+	for _, name := range cfg.Names() {
+		match := cfg.Profiles[name].Match
+		if match == "" {
+			match = name
+		}
+		matches = append(matches, match)
+	}
+	context, err := typer.Context(matches)
 	if err != nil {
 		return err
 	}
