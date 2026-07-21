@@ -29,7 +29,7 @@ Homebrew 6 不再接受仓库内的本地 Formula；项目建立独立 Homebrew 
 交互输入不会回显，也不会进入 shell history：
 
 ```bash
-windotp add --default production
+windotp add --default jump1
 windotp add staging
 windotp list
 ```
@@ -37,7 +37,7 @@ windotp list
 也可以从密码管理器通过 stdin 导入 Base32 或 `otpauth://` URL：
 
 ```bash
-password-command | windotp add --stdin production
+password-command | windotp add --stdin jump1
 ```
 
 WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell history 或其他进程读取。
@@ -47,10 +47,10 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 先在终端验证 TOTP 是否正确：
 
 ```bash
-windotp code production
+windotp code jump1
 ```
 
-`windotp type production` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
+`windotp type jump1` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
 因为此时 Terminal 而不是 WindTerm 位于前台。
 
 首次输入时，macOS 可能要求 Automation 或 Accessibility 权限。按系统提示授权运行命令的
@@ -71,10 +71,10 @@ Keychain，因此不适合作为 WindOTP 的入口。
 4. 填写下面的命令，并将用户名、安装路径和 profile 替换为实际值：
 
    ```bash
-   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp type production
+   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp type jump1
    ```
 
-5. 保存为 `WindOTP production`。
+5. 保存为 `WindOTP jump1`。
 6. 打开“系统设置 → 键盘 → 键盘快捷键 → 服务 → 通用”。
 7. 勾选该服务，双击右侧空白处并按下快捷键，例如 `Control-Option-P`。
 
@@ -90,7 +90,7 @@ WindTerm 的 Trigger 支持匹配文本后运行外部程序。可创建 session
 - Pattern: `Please enter 6 digits\.`
 - Action: Run App
 - App: `/opt/homebrew/bin/windotp`
-- Arguments: `type --delay 200ms production`
+- Arguments: `type --delay 200ms jump1`
 
 自动 Trigger 只适合当前登录 session 位于前台的情况。如果多个 tab 同时登录，后台 tab 的
 Trigger 可能在前台 tab 输入验证码；WindOTP 只能确认前台应用是 WindTerm，无法可靠识别当前
