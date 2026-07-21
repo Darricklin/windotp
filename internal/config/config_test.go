@@ -2,7 +2,9 @@ package config
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -32,5 +34,30 @@ func TestSaveLoadAndResolve(t *testing.T) {
 	}
 	if name != "prod" {
 		t.Errorf("Resolve() = %q, want prod", name)
+	}
+}
+
+func TestPathWithoutHomeEnvironment(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("WINDOTP_CONFIG", "")
+
+	originalLookup := lookupCurrentUser
+	lookupCurrentUser = func() (*user.User, error) {
+		return &user.User{HomeDir: "/Users/shortcut-user"}, nil
+	}
+	t.Cleanup(func() { lookupCurrentUser = originalLookup })
+
+	wantBase := filepath.Join("/Users/shortcut-user", ".config")
+	if runtime.GOOS == "darwin" {
+		wantBase = filepath.Join("/Users/shortcut-user", "Library", "Application Support")
+	}
+	want := filepath.Join(wantBase, "windotp", "config.json")
+	got, err := Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("Path() = %q, want %q", got, want)
 	}
 }

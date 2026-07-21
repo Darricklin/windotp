@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"time"
 )
 
 const currentVersion = 1
+
+var lookupCurrentUser = user.Current
 
 type Profile struct {
 	CreatedAt time.Time `json:"created_at"`
@@ -32,7 +36,17 @@ func Path() (string, error) {
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "", fmt.Errorf("find user config directory: %w", err)
+		current, lookupErr := lookupCurrentUser()
+		if lookupErr != nil {
+			return "", fmt.Errorf("find user config directory: %w; look up current user: %v", err, lookupErr)
+		}
+		if current.HomeDir == "" {
+			return "", fmt.Errorf("find user config directory: current user has no home directory")
+		}
+		base = filepath.Join(current.HomeDir, ".config")
+		if runtime.GOOS == "darwin" {
+			base = filepath.Join(current.HomeDir, "Library", "Application Support")
+		}
 	}
 	return filepath.Join(base, "windotp", "config.json"), nil
 }
