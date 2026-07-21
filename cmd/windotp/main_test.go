@@ -6,7 +6,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Darricklin/windotp/internal/config"
 	"github.com/Darricklin/windotp/internal/store"
 )
 
@@ -86,5 +88,32 @@ func TestAddRejectsSecretArgument(t *testing.T) {
 	err := a.run([]string{"add", "--secret", "JBSWY3DPEHPK3PXP", "prod"})
 	if err == nil {
 		t.Fatal("add unexpectedly accepted --secret")
+	}
+}
+
+func TestMatchProfile(t *testing.T) {
+	cfg := config.New()
+	cfg.Profiles["jump1"] = config.Profile{CreatedAt: time.Now(), Match: "jump-bj.sensetime.com"}
+	cfg.Profiles["jump2"] = config.Profile{CreatedAt: time.Now(), Match: "jump-sh.sensetime.com"}
+
+	got, err := matchProfile(cfg, []string{"WindTerm", "jump-bj.sensetime.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "jump1" {
+		t.Errorf("matchProfile() = %q, want jump1", got)
+	}
+}
+
+func TestMatchProfileRejectsMissingAndAmbiguousMatches(t *testing.T) {
+	cfg := config.New()
+	cfg.Profiles["jump"] = config.Profile{Match: "sensetime.com"}
+	cfg.Profiles["jump-bj"] = config.Profile{Match: "jump-bj.sensetime.com"}
+
+	if _, err := matchProfile(cfg, []string{"unrelated.example.com"}); err == nil {
+		t.Fatal("missing match unexpectedly succeeded")
+	}
+	if _, err := matchProfile(cfg, []string{"jump-bj.sensetime.com"}); err == nil {
+		t.Fatal("ambiguous match unexpectedly succeeded")
 	}
 }

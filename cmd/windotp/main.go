@@ -47,12 +47,16 @@ func (a app) run(args []string) error {
 		return a.list(args[1:])
 	case "default":
 		return a.setDefault(args[1:])
+	case "bind":
+		return a.bind(args[1:])
 	case "code":
 		return a.code(args[1:])
 	case "type":
 		return a.typeCode(args[1:])
 	case "choose":
 		return a.choose(args[1:])
+	case "auto":
+		return a.auto(args[1:])
 	case "remove":
 		return a.remove(args[1:])
 	case "doctor":
@@ -75,9 +79,11 @@ Usage:
   windotp add [--stdin] [--default] NAME
   windotp list
   windotp default NAME
+  windotp bind NAME WINDTERM_TAB_MATCH
   windotp code [NAME]
   windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
   windotp choose [--enter=true] [--min-validity=5s]
+  windotp auto [--enter=true] [--min-validity=5s]
   windotp remove NAME
   windotp doctor
   windotp version
@@ -209,6 +215,31 @@ func (a app) setDefault(args []string) error {
 	return nil
 }
 
+func (a app) bind(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: windotp bind NAME WINDTERM_TAB_MATCH")
+	}
+	name, match := args[0], args[1]
+	if err := profile.ValidateMatch(match); err != nil {
+		return err
+	}
+	path, cfg, err := a.load()
+	if err != nil {
+		return err
+	}
+	if _, err := cfg.Resolve(name); err != nil {
+		return err
+	}
+	entry := cfg.Profiles[name]
+	entry.Match = match
+	cfg.Profiles[name] = entry
+	if err := config.Save(path, cfg); err != nil {
+		return err
+	}
+	fmt.Fprintf(a.stdout, "bound profile %q to WindTerm tab match %q\n", name, match)
+	return nil
+}
+
 func (a app) code(args []string) error {
 	fs := flag.NewFlagSet("code", flag.ContinueOnError)
 	fs.SetOutput(a.stderr)
@@ -291,6 +322,59 @@ func (a app) choose(args []string) error {
 		return err
 	}
 	return a.typeProfile(selected, *minValidity, 0, typer.Options{Enter: *enter, ActivateWindTerm: true})
+}
+
+func (a app) auto(args []string) error {
+	fs := flag.NewFlagSet("auto", flag.ContinueOnError)
+	fs.SetOutput(a.stderr)
+	enter := fs.Bool("enter", true, "press Enter after typing")
+	minValidity := fs.Duration("min-validity", 5*time.Second, "wait for a new code when less validity remains")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("usage: windotp auto [OPTIONS]")
+	}
+	if *minValidity < 0 || *minValidity >= totp.Period {
+		return fmt.Errorf("min-validity must be between 0 and %s", totp.Period)
+	}
+	_, cfg, err := a.load()
+	if err != nil {
+		return err
+	}
+	context, err := typer.Context()
+	if err != nil {
+		return err
+	}
+	sources := append([]string{context.Window}, context.Candidates...)
+	name, err := matchProfile(cfg, sources)
+	if err != nil {
+		return err
+	}
+	return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
+}
+
+func matchProfile(cfg config.Config, sources []string) (string, error) {
+	matched := make([]string, 0, 1)
+	for _, name := range cfg.Names() {
+		match := cfg.Profiles[name].Match
+		if match == "" {
+			match = name
+		}
+		for _, source := range sources {
+			if strings.Contains(strings.ToLower(source), strings.ToLower(match)) {
+				matched = append(matched, name)
+				break
+			}
+		}
+	}
+	if len(matched) == 0 {
+		return "", fmt.Errorf("no profile matches the active WindTerm tab; detected labels: %q", nonEmpty(sources))
+	}
+	if len(matched) > 1 {
+		return "", fmt.Errorf("active WindTerm tab matches multiple profiles: %s", strings.Join(matched, ", "))
+	}
+	return matched[0], nil
 }
 
 func (a app) typeProfile(name string, minValidity, delay time.Duration, opts typer.Options) error {
@@ -392,4 +476,14 @@ func wipe(data []byte) {
 	for i := range data {
 		data[i] = 0
 	}
+}
+
+func nonEmpty(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != "" {
+			result = append(result, value)
+		}
+	}
+	return result
 }

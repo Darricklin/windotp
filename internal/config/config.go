@@ -18,6 +18,7 @@ var lookupCurrentUser = user.Current
 
 type Profile struct {
 	CreatedAt time.Time `json:"created_at"`
+	Match     string    `json:"match,omitempty"`
 }
 
 type Config struct {

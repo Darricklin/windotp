@@ -31,6 +31,8 @@ Homebrew 6 不再接受仓库内的本地 Formula；项目建立独立 Homebrew 
 ```bash
 windotp add --default jump1
 windotp add staging
+windotp bind jump1 jump-bj.sensetime.com
+windotp bind staging jump-sh.sensetime.com
 windotp list
 ```
 
@@ -50,7 +52,7 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 windotp code jump1
 ```
 
-`windotp choose` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
+`windotp auto` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
 因为此时 Terminal 而不是 WindTerm 位于前台。
 
 首次输入时，macOS 可能要求 Automation 或 Accessibility 权限。按系统提示授权运行命令的
@@ -71,7 +73,7 @@ Keychain，因此不适合作为 WindOTP 的入口。
 4. 填写下面的命令，并将用户名和安装路径替换为实际值：
 
    ```bash
-   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp choose
+   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp auto
    ```
 
 5. 保存为 `WindOTP`。
@@ -79,7 +81,8 @@ Keychain，因此不适合作为 WindOTP 的入口。
 7. 勾选该服务，双击右侧空白处并按下快捷键，例如 `Control-Option-P`。
 
 使用 `command -v windotp` 可确认实际安装路径。所有 JumpServer profile 共用这一个 Automator
-快速操作和一个快捷键；按下快捷键后，从弹出的列表中选择 JumpServer。
+快速操作和一个快捷键。WindOTP 根据 WindTerm 当前选中 tab 的标签自动匹配 profile，不弹出列表；
+无法唯一匹配时会拒绝输入。
 
 实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。
 
@@ -102,9 +105,11 @@ WindTerm tab。因此多 session 环境推荐使用快捷键模式。
 windotp add [--stdin] [--default] NAME
 windotp list
 windotp default NAME
+windotp bind NAME WINDTERM_TAB_MATCH
 windotp code [NAME]
 windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
 windotp choose [--enter=true] [--min-validity=5s]
+windotp auto [--enter=true] [--min-validity=5s]
 windotp remove NAME
 windotp doctor
 windotp version

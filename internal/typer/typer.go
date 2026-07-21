@@ -10,6 +10,11 @@ type Options struct {
 	ActivateWindTerm bool
 }
 
+type FrontContext struct {
+	Window     string   `json:"window"`
+	Candidates []string `json:"candidates"`
+}
+
 func Type(code string, opts Options) error {
 	return platformType(code, opts)
 }
@@ -20,4 +25,8 @@ func Check() error {
 
 func Choose(profiles []string, defaultProfile string) (string, error) {
 	return platformChoose(profiles, defaultProfile)
+}
+
+func Context() (FrontContext, error) {
+	return platformContext()
 }

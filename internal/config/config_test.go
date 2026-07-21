@@ -12,7 +12,7 @@ import (
 func TestSaveLoadAndResolve(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "config.json")
 	cfg := New()
-	cfg.Profiles["prod"] = Profile{CreatedAt: time.Unix(123, 0).UTC()}
+	cfg.Profiles["prod"] = Profile{CreatedAt: time.Unix(123, 0).UTC(), Match: "jump.example.com"}
 	cfg.DefaultProfile = "prod"
 	if err := Save(path, cfg); err != nil {
 		t.Fatal(err)
@@ -34,6 +34,9 @@ func TestSaveLoadAndResolve(t *testing.T) {
 	}
 	if name != "prod" {
 		t.Errorf("Resolve() = %q, want prod", name)
+	}
+	if got.Profiles["prod"].Match != "jump.example.com" {
+		t.Errorf("Match = %q, want jump.example.com", got.Profiles["prod"].Match)
 	}
 }
 

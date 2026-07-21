@@ -4,6 +4,7 @@ package typer
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -11,6 +12,69 @@ import (
 )
 
 var sixDigits = regexp.MustCompile(`^[0-9]{6}$`)
+
+const frontContextScript = `const systemEvents = Application("System Events");
+const windTerm = systemEvents.applicationProcesses.byName("WindTerm");
+if (!windTerm.exists()) {
+    throw new Error("WindTerm is not running");
+}
+if (!windTerm.frontmost()) {
+    throw new Error("WindTerm is not the frontmost application");
+}
+
+function safe(call, fallback) {
+    try {
+        return call();
+    } catch (_) {
+        return fallback;
+    }
+}
+
+const windows = safe(() => windTerm.windows(), []);
+if (windows.length === 0) {
+    throw new Error("WindTerm has no accessible window");
+}
+const frontWindow = windows[0];
+const candidates = [];
+const seen = {};
+let visited = 0;
+
+function addCandidate(value) {
+    if (typeof value !== "string" || value.length === 0 || seen[value]) {
+        return;
+    }
+    seen[value] = true;
+    candidates.push(value);
+}
+
+function visit(element, depth) {
+    if (depth > 12 || visited >= 3000) {
+        return;
+    }
+    visited += 1;
+    const role = safe(() => element.role(), "");
+    const name = safe(() => element.name(), "");
+    const focused = safe(() => element.focused(), false) === true;
+    const selected = safe(() => element.selected(), false) === true;
+    let activeControl = false;
+    if (role === "AXRadioButton" || role === "AXTab" || role === "AXButton" || role === "AXCheckBox") {
+        const value = safe(() => element.value(), 0);
+        activeControl = value === 1 || value === true || value === "1";
+    }
+    if (focused || selected || activeControl) {
+        addCandidate(name);
+    }
+    const children = safe(() => element.uiElements(), []);
+    for (let i = 0; i < children.length; i += 1) {
+        visit(children[i], depth + 1);
+    }
+}
+
+visit(frontWindow, 0);
+JSON.stringify({
+    window: safe(() => frontWindow.name(), ""),
+    candidates: candidates
+});`
 
 func platformType(code string, opts Options) error {
 	if !sixDigits.MatchString(code) {
@@ -78,6 +142,20 @@ return item 1 of picked
 		return "", ErrCanceled
 	}
 	return selected, nil
+}
+
+func platformContext() (FrontContext, error) {
+	cmd := exec.Command("/usr/bin/osascript", "-l", "JavaScript")
+	cmd.Stdin = bytes.NewBufferString(frontContextScript)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return FrontContext{}, fmt.Errorf("inspect active WindTerm tab: %s: %w", bytes.TrimSpace(output), err)
+	}
+	var context FrontContext
+	if err := json.Unmarshal(bytes.TrimSpace(output), &context); err != nil {
+		return FrontContext{}, fmt.Errorf("decode active WindTerm context: %w", err)
+	}
+	return context, nil
 }
 
 func platformCheck() error {
