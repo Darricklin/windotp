@@ -16,18 +16,13 @@ Base32 密钥只存放在 macOS Keychain 中。配置文件仅保存 profile 名
 ```bash
 git clone https://github.com/Darricklin/windotp.git
 cd windotp
+brew install go
 make test
-make install PREFIX=/opt/homebrew
+make install PREFIX="$(brew --prefix)"
 ```
 
-发布到 GitHub 后，可以通过项目内的 Homebrew Formula 安装 HEAD 版本：
-
-```bash
-brew install --HEAD ./Formula/windotp.rb
-```
-
-Apple Silicon 的 tag release 由 GitHub Actions 自动构建。正式发布稳定版 Homebrew Formula
-时，需要加入对应 release tarball 的 URL 和 SHA256；也可以再创建独立的 Homebrew tap。
+Homebrew 6 不再接受仓库内的本地 Formula；项目建立独立 Homebrew tap 后再提供 `brew install`
+方式。Apple Silicon 的 tag release 由 GitHub Actions 自动构建。
 
 ## 添加 JumpServer
 
@@ -55,17 +50,11 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 windotp code production
 ```
 
-再打开 WindTerm，让光标停在 `Please enter 6 digits.` 后运行：
-
-```bash
-windotp type production
-```
-
-默认会输入六位码并按 Enter。如果验证码剩余有效期不足 5 秒，会等到下一个 30 秒周期。
-WindTerm 不是前台应用时命令会拒绝输入。
+`windotp type production` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
+因为此时 Terminal 而不是 WindTerm 位于前台。
 
 首次输入时，macOS 可能要求 Automation 或 Accessibility 权限。按系统提示授权运行命令的
-Terminal、Shortcuts 或 Automator，然后执行：
+Terminal 或 Automator，然后执行：
 
 ```bash
 windotp doctor
@@ -73,12 +62,24 @@ windotp doctor
 
 ## 设置快捷键
 
-推荐用 macOS 自带的“快捷指令”：
+使用 macOS 自带的 Automator。“快捷指令”的 Shell 操作运行在沙箱中，可能无法读取登录
+Keychain，因此不适合作为 WindOTP 的入口。
 
-1. 新建一个快捷指令，加入“运行 Shell 脚本”。
-2. 脚本填写 `/opt/homebrew/bin/windotp type production`。
-3. 在快捷指令详情中选择“添加键盘快捷键”，例如 `Control-Option-O`。
-4. 为每个 JumpServer profile 建一个快捷指令，或者只给默认 profile 建一个。
+1. 打开 Automator，新建“快速操作”。
+2. 设置“工作流程收到当前：没有输入”“位于：任何应用程序”。
+3. 添加“运行 Shell 脚本”。
+4. 填写下面的命令，并将用户名、安装路径和 profile 替换为实际值：
+
+   ```bash
+   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp type production
+   ```
+
+5. 保存为 `WindOTP production`。
+6. 打开“系统设置 → 键盘 → 键盘快捷键 → 服务 → 通用”。
+7. 勾选该服务，双击右侧空白处并按下快捷键，例如 `Control-Option-P`。
+
+使用 `command -v windotp` 可确认实际安装路径。每个 JumpServer profile 可以建立一个独立的
+Automator 快速操作。
 
 实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。
 
