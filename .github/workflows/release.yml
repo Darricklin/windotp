@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./...
+      - name: Build Apple Silicon archive
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/windotp
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o dist/windotp/windotp ./cmd/windotp
+          cp README.md LICENSE dist/windotp/
+          tar -C dist -czf "dist/windotp_${VERSION}_darwin_arm64.tar.gz" windotp
+          shasum -a 256 "dist/windotp_${VERSION}_darwin_arm64.tar.gz" > "dist/windotp_${VERSION}_checksums.txt"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/*.tar.gz dist/*_checksums.txt --generate-notes

@@ -1,0 +1,15 @@
+//go:build !darwin
+
+package typer
+
+import (
+	"fmt"
+	"runtime"
+)
+
+func platformType(string, Options) error { return unsupportedError() }
+func platformCheck() error               { return unsupportedError() }
+
+func unsupportedError() error {
+	return fmt.Errorf("WindTerm typing is only supported on macOS, not %s", runtime.GOOS)
+}
