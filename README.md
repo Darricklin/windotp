@@ -50,7 +50,7 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 windotp code jump1
 ```
 
-`windotp type jump1` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
+`windotp choose` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
 因为此时 Terminal 而不是 WindTerm 位于前台。
 
 首次输入时，macOS 可能要求 Automation 或 Accessibility 权限。按系统提示授权运行命令的
@@ -68,18 +68,18 @@ Keychain，因此不适合作为 WindOTP 的入口。
 1. 打开 Automator，新建“快速操作”。
 2. 设置“工作流程收到当前：没有输入”“位于：任何应用程序”。
 3. 添加“运行 Shell 脚本”。
-4. 填写下面的命令，并将用户名、安装路径和 profile 替换为实际值：
+4. 填写下面的命令，并将用户名和安装路径替换为实际值：
 
    ```bash
-   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp type jump1
+   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp choose
    ```
 
-5. 保存为 `WindOTP jump1`。
+5. 保存为 `WindOTP`。
 6. 打开“系统设置 → 键盘 → 键盘快捷键 → 服务 → 通用”。
 7. 勾选该服务，双击右侧空白处并按下快捷键，例如 `Control-Option-P`。
 
-使用 `command -v windotp` 可确认实际安装路径。每个 JumpServer profile 可以建立一个独立的
-Automator 快速操作。
+使用 `command -v windotp` 可确认实际安装路径。所有 JumpServer profile 共用这一个 Automator
+快速操作和一个快捷键；按下快捷键后，从弹出的列表中选择 JumpServer。
 
 实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。
 
@@ -104,6 +104,7 @@ windotp list
 windotp default NAME
 windotp code [NAME]
 windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
+windotp choose [--enter=true] [--min-validity=5s]
 windotp remove NAME
 windotp doctor
 windotp version

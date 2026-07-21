@@ -51,6 +51,8 @@ func (a app) run(args []string) error {
 		return a.code(args[1:])
 	case "type":
 		return a.typeCode(args[1:])
+	case "choose":
+		return a.choose(args[1:])
 	case "remove":
 		return a.remove(args[1:])
 	case "doctor":
@@ -75,6 +77,7 @@ Usage:
   windotp default NAME
   windotp code [NAME]
   windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
+  windotp choose [--enter=true] [--min-validity=5s]
   windotp remove NAME
   windotp doctor
   windotp version
@@ -259,17 +262,49 @@ func (a app) typeCode(args []string) error {
 	if fs.NArg() == 1 {
 		name = fs.Arg(0)
 	}
+	return a.typeProfile(name, *minValidity, *delay, typer.Options{Enter: *enter, AllowAnyApp: *allowAnyApp})
+}
+
+func (a app) choose(args []string) error {
+	fs := flag.NewFlagSet("choose", flag.ContinueOnError)
+	fs.SetOutput(a.stderr)
+	enter := fs.Bool("enter", true, "press Enter after typing")
+	minValidity := fs.Duration("min-validity", 5*time.Second, "wait for a new code when less validity remains")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("usage: windotp choose [OPTIONS]")
+	}
+	if *minValidity < 0 || *minValidity >= totp.Period {
+		return fmt.Errorf("min-validity must be between 0 and %s", totp.Period)
+	}
+	_, cfg, err := a.load()
+	if err != nil {
+		return err
+	}
+	selected, err := typer.Choose(cfg.Names(), cfg.DefaultProfile)
+	if errors.Is(err, typer.ErrCanceled) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return a.typeProfile(selected, *minValidity, 0, typer.Options{Enter: *enter, ActivateWindTerm: true})
+}
+
+func (a app) typeProfile(name string, minValidity, delay time.Duration, opts typer.Options) error {
 	name, secret, err := a.resolveSecret(name)
 	if err != nil {
 		return err
 	}
 	defer wipe(secret)
 
-	if *delay > 0 {
-		time.Sleep(*delay)
+	if delay > 0 {
+		time.Sleep(delay)
 	}
 	now := time.Now()
-	if totp.Remaining(now) < *minValidity {
+	if totp.Remaining(now) < minValidity {
 		time.Sleep(totp.Remaining(now) + 50*time.Millisecond)
 		now = time.Now()
 	}
@@ -277,7 +312,7 @@ func (a app) typeCode(args []string) error {
 	if err != nil {
 		return fmt.Errorf("generate code for %q: %w", name, err)
 	}
-	return typer.Type(value, typer.Options{Enter: *enter, AllowAnyApp: *allowAnyApp})
+	return typer.Type(value, opts)
 }
 
 func (a app) resolveSecret(name string) (string, []byte, error) {

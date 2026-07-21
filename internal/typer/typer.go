@@ -1,8 +1,13 @@
 package typer
 
+import "errors"
+
+var ErrCanceled = errors.New("profile selection canceled")
+
 type Options struct {
-	Enter       bool
-	AllowAnyApp bool
+	Enter            bool
+	AllowAnyApp      bool
+	ActivateWindTerm bool
 }
 
 func Type(code string, opts Options) error {
@@ -11,4 +16,8 @@ func Type(code string, opts Options) error {
 
 func Check() error {
 	return platformCheck()
+}
+
+func Choose(profiles []string, defaultProfile string) (string, error) {
+	return platformChoose(profiles, defaultProfile)
 }
