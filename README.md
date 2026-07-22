@@ -109,7 +109,7 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
    | 字段 | 值 |
    | --- | --- |
    | Pattern | `Please enter 6 digits\.` |
-   | Action | `Run App` |
+   | 类型 | `运行命令`（Run Command，不要选择“自定义链接”） |
    | App | `/opt/homebrew/bin/windotp` |
    | Arguments | `trigger jump1` |
 
@@ -189,6 +189,8 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
 
 ## 常见问题
 
+- Trigger 完全没有反应：确认 Trigger 类型选择的是“运行命令”（Run Command），不是“自定义链接”，
+  并确认 Trigger 已启用且保存在当前 session。
 - `WindTerm is not the frontmost application`：先点击目标 WindTerm tab，再重新触发登录或按快捷键。
 - `no profile matches the active WindTerm tab`：运行 `windotp list` 检查 profile，再用
   `windotp bind NAME TAB_LABEL` 重新绑定；`TAB_LABEL` 必须出现在当前 tab 标签中。
