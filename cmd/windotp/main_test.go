@@ -141,24 +141,17 @@ func TestMatchesProfile(t *testing.T) {
 	}
 }
 
-func TestTriggerValidatesArguments(t *testing.T) {
-	t.Setenv("WINDOTP_CONFIG", t.TempDir()+"/config.json")
-	tests := []struct {
-		name string
-		args []string
-	}{
-		{name: "missing profile", args: []string{"trigger"}},
-		{name: "trusted trigger still requires profile", args: []string{"trigger", "--trust-profile"}},
-		{name: "negative delay", args: []string{"trigger", "--delay=-1ms", "prod"}},
-		{name: "invalid minimum validity", args: []string{"trigger", "--min-validity=30s", "prod"}},
+func TestHelpOmitsRemovedTriggerCommand(t *testing.T) {
+	var stdout bytes.Buffer
+	a := app{stdin: strings.NewReader(""), stdout: &stdout, stderr: &bytes.Buffer{}, store: memoryStore{}}
+	if err := a.run([]string{"help"}); err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := app{stdin: strings.NewReader(""), stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, store: memoryStore{}}
-			if err := a.run(tt.args); err == nil {
-				t.Fatalf("run(%q) unexpectedly succeeded", tt.args)
-			}
-		})
+	if strings.Contains(stdout.String(), "windotp trigger") {
+		t.Fatalf("help still contains removed trigger command: %q", stdout.String())
+	}
+	if err := a.run([]string{"trigger", "prod"}); err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("removed trigger returned unexpected error: %v", err)
 	}
 }
 
