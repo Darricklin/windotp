@@ -29,7 +29,15 @@ func TestPromptVisibleScriptCompiles(t *testing.T) {
 }
 
 func TestPromptVisibleScriptClearsRememberStep(t *testing.T) {
-	for _, marker := range []string{"remember this step", "记住这一步", "AXPress", "rememberCleared"} {
+	for _, marker := range []string{
+		"remember this step",
+		"记住这一步",
+		"AXPress",
+		"systemEvents.keyCode(49)",
+		"clickCenter(element)",
+		"if (!checked(element))",
+		"rememberCleared",
+	} {
 		if !strings.Contains(promptVisibleScript, marker) {
 			t.Fatalf("prompt script does not contain %q", marker)
 		}

@@ -174,24 +174,24 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
         return value === true || value === 1 || value === "1" || value === "true" || value === "checked";
     }
 
-    function elementValues(element, includeValue) {
-        const values = [
+    function elementValues(element) {
+        return [
             safe(() => element.name(), ""),
-            safe(() => element.title(), ""),
             safe(() => element.description(), ""),
-            safe(() => element.help(), "")
+            safe(() => element.value(), "")
         ];
-        if (includeValue) {
-            values.push(safe(() => element.value(), ""));
-        }
-        return values;
     }
 
     function isRememberCheckbox(element, role) {
         if (role !== "AXCheckBox") {
             return false;
         }
-        const values = elementValues(element, false);
+        const values = [
+            safe(() => element.name(), ""),
+            safe(() => element.title(), ""),
+            safe(() => element.description(), ""),
+            safe(() => element.help(), "")
+        ];
         for (let i = 0; i < values.length; i += 1) {
             if (typeof values[i] !== "string") {
                 continue;
@@ -204,6 +204,29 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
         return false;
     }
 
+    function clickCenter(element) {
+        const position = safe(() => element.position(), []);
+        const size = safe(() => element.size(), []);
+        if (position.length !== 2 || size.length !== 2) {
+            return false;
+        }
+        return safe(() => {
+            systemEvents.click({at: [
+                Math.round(position[0] + size[0] / 2),
+                Math.round(position[1] + size[1] / 2)
+            ]});
+            return true;
+        }, false);
+    }
+
+    function checked(element) {
+        return isChecked(safe(() => element.value(), true));
+    }
+
+    function waitForCheckboxUpdate() {
+        delay(0.05);
+    }
+
     let promptFound = false;
     let rememberFound = false;
     let rememberCleared = false;
@@ -211,56 +234,67 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
     // The terminal buffer is normally the focused AXTextArea. Ignoring it
     // makes checks before the MFA dialog appears effectively constant-time.
     const inputFound = focusedInput !== null && isMFAInput(focusedInput);
-    let focusedContainer = null;
 
-    if (inputFound) {
-        let current = focusedInput;
-        for (let depth = 0; current !== null && depth < 16; depth += 1) {
-            focusedContainer = current;
-            const role = safe(() => current.role(), "");
-            if (role === "AXSheet" || role === "AXDialog" || role === "AXWindow") {
-                break;
-            }
-            current = safe(() => current.attributes.byName("AXParent").value(), null);
+    function focusMFAInput() {
+        if (safe(() => focusedInput.focused(), false) === true) {
+            return true;
         }
+        safe(() => {
+            focusedInput.attributes.byName("AXFocused").value = true;
+            return true;
+        }, false);
+        if (safe(() => focusedInput.focused(), false) === true) {
+            return true;
+        }
+        clickCenter(focusedInput);
+        return safe(() => focusedInput.focused(), false) === true;
     }
 
-    const queue = focusedContainer === null ? [] : [{element: focusedContainer, depth: 0}];
-    let cursor = 0;
-    let visited = 0;
-    while (cursor < queue.length && visited < 1000 && !(promptFound && rememberCleared)) {
-        const current = queue[cursor];
-        cursor += 1;
-        visited += 1;
+    function clearRememberCheckbox(element) {
+        if (!checked(element)) {
+            return true;
+        }
 
-        const element = current.element;
-        const depth = current.depth;
-        const role = safe(() => element.role(), "");
+        safe(() => element.actions.byName("AXPress").perform(), null);
+        waitForCheckboxUpdate();
+        if (!checked(element)) {
+            return focusMFAInput();
+        }
 
+        safe(() => element.click(), null);
+        waitForCheckboxUpdate();
+        if (!checked(element)) {
+            return focusMFAInput();
+        }
+
+        safe(() => {
+            element.attributes.byName("AXFocused").value = true;
+            systemEvents.keyCode(49);
+        }, null);
+        waitForCheckboxUpdate();
+        if (!checked(element)) {
+            return focusMFAInput();
+        }
+
+        clickCenter(element);
+        waitForCheckboxUpdate();
+        if (!checked(element)) {
+            return focusMFAInput();
+        }
+        focusMFAInput();
+        return false;
+    }
+
+    function inspect(element, role) {
         if (isRememberCheckbox(element, role)) {
             rememberFound = true;
-            const value = safe(() => element.value(), false);
-            if (!isChecked(value)) {
-                rememberCleared = true;
-            } else {
-                let pressed = safe(() => {
-                    element.actions.byName("AXPress").perform();
-                    return true;
-                }, false);
-                if (!pressed) {
-                    pressed = safe(() => {
-                        element.click();
-                        return true;
-                    }, false);
-                }
-                rememberCleared = pressed;
-            }
+            rememberCleared = clearRememberCheckbox(element);
         }
 
         // Ignore text rendered in the terminal buffer. This command is only
         // for WindTerm's graphical keyboard-interactive dialog.
-        if (role !== "AXTextArea" && role !== "AXWebArea") {
-            const values = elementValues(element, true);
+        if (!promptFound && role !== "AXTextArea" && role !== "AXWebArea") {
+            const values = elementValues(element);
             for (let i = 0; i < values.length; i += 1) {
                 if (typeof values[i] === "string" && values[i].indexOf(expectedPrompt) !== -1) {
                     promptFound = true;
@@ -268,13 +302,48 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
                 }
             }
         }
+    }
 
-        const skipChildren = role === "AXTextArea" || role === "AXTable" || role === "AXOutline" || role === "AXWebArea";
-        if (!skipChildren && depth < 16) {
-            const children = safe(() => element.uiElements(), []);
-            for (let i = 0; i < children.length; i += 1) {
-                queue.push({element: children[i], depth: depth + 1});
+    function scan(root, maxDepth, maxVisited) {
+        const queue = [{element: root, depth: 0}];
+        let cursor = 0;
+        let visited = 0;
+        while (cursor < queue.length && visited < maxVisited && !(promptFound && rememberCleared)) {
+            const current = queue[cursor];
+            cursor += 1;
+            visited += 1;
+
+            const element = current.element;
+            const depth = current.depth;
+            const role = safe(() => element.role(), "");
+            inspect(element, role);
+
+            const skipChildren = role === "AXTextArea" || role === "AXTable" || role === "AXOutline" || role === "AXWebArea";
+            if (!skipChildren && depth < maxDepth) {
+                const children = safe(() => element.uiElements(), []);
+                for (let i = 0; i < children.length; i += 1) {
+                    queue.push({element: children[i], depth: depth + 1});
+                }
             }
+        }
+    }
+
+    if (inputFound) {
+        const roots = [];
+        let current = safe(() => focusedInput.attributes.byName("AXParent").value(), null);
+        for (let depth = 0; current !== null && depth < 10; depth += 1) {
+            roots.push(current);
+            const role = safe(() => current.role(), "");
+            if (role === "AXSheet" || role === "AXDialog" || role === "AXWindow") {
+                break;
+            }
+            current = safe(() => current.attributes.byName("AXParent").value(), null);
+        }
+
+        // Search the nearest input ancestors first. The prompt and checkbox
+        // are normally siblings within the same small dialog container.
+        for (let i = 0; i < roots.length && !(promptFound && rememberCleared); i += 1) {
+            scan(roots[i], 4, 160);
         }
     }
 
