@@ -38,8 +38,8 @@ Homebrew 6 不再接受仓库内的本地 Formula；项目建立独立 Homebrew 
 ```bash
 windotp add --default jump1
 windotp add jump2
-windotp bind jump1 jump-bj.sensetime.com
-windotp bind jump2 jump.sensecore.cn
+windotp bind jump1 jump-server-1
+windotp bind jump2 jump-server-2
 windotp list
 ```
 
@@ -140,7 +140,7 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
 5. 保存为 `WindOTP`。
 6. 打开“系统设置 → 键盘 → 键盘快捷键 → 服务 → 通用”。
 7. 勾选该服务，双击右侧空白处并按下快捷键，例如 `Control-Option-P`。
-8. 回到 WindTerm，选中 `jump-bj.sensetime.com` 或 `jump.sensecore.cn` tab，发起登录。看到
+8. 回到 WindTerm，选中 `jump-server-1` 或 `jump-server-2` tab，发起登录。看到
    `Please enter 6 digits.` 后按快捷键，WindOTP 会自动识别 tab、输入验证码并按回车。
 9. 第一次使用时，如果 macOS 请求 Automator、Automator Runner 或 System Events 权限，请允许；
    也可在“系统设置 -> 隐私与安全性 -> 辅助功能”中手动启用对应项目。
@@ -167,7 +167,7 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
 - `cannot read the active WindTerm tab label`：快捷键模式需要为 Automator 授予 Accessibility 权限。自动弹窗
   模式可使用 `popup --trust-profile NAME`，但必须确保对应 session 始终位于前台。
 - `active WindTerm tab matches multiple profiles`：不同 profile 的绑定内容有重叠，改用更完整、唯一的
-  tab 标签，例如 `jump-bj.sensetime.com` 和 `jump.sensecore.cn`。
+  tab 标签，例如 `jump-server-1` 和 `jump-server-2`。
 - Accessibility 报错：允许实际调用 WindOTP 的 Terminal、WindTerm 或 Automator，然后完全退出并重新打开
   对应应用。
 - 验证码不正确：先运行 `windotp code NAME` 与 Google Authenticator 对比，并确认 Mac 的日期与时间
