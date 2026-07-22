@@ -296,8 +296,16 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
         if (!promptFound && role !== "AXTextArea" && role !== "AXWebArea") {
             const values = elementValues(element);
             for (let i = 0; i < values.length; i += 1) {
-                if (typeof values[i] === "string" && values[i].indexOf(expectedPrompt) !== -1) {
-                    promptFound = true;
+                if (typeof values[i] !== "string") {
+                    continue;
+                }
+                for (let j = 0; j < expectedPrompts.length; j += 1) {
+                    if (values[i].indexOf(expectedPrompts[j]) !== -1) {
+                        promptFound = true;
+                        break;
+                    }
+                }
+                if (promptFound) {
                     break;
                 }
             }
@@ -441,13 +449,13 @@ func platformContext(matches []string) (FrontContext, error) {
 	return context, nil
 }
 
-func platformPromptVisible(prompt string) (bool, error) {
-	encodedPrompt, err := json.Marshal(prompt)
+func platformPromptVisible(prompts []string) (bool, error) {
+	encodedPrompts, err := json.Marshal(prompts)
 	if err != nil {
-		return false, fmt.Errorf("encode MFA prompt: %w", err)
+		return false, fmt.Errorf("encode MFA prompts: %w", err)
 	}
 	cmd := exec.Command("/usr/bin/osascript", "-l", "JavaScript")
-	cmd.Stdin = bytes.NewBufferString("const expectedPrompt = " + string(encodedPrompt) + ";\n" + promptVisibleScript)
+	cmd.Stdin = bytes.NewBufferString("const expectedPrompts = " + string(encodedPrompts) + ";\n" + promptVisibleScript)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("inspect WindTerm MFA dialog: %s: %w", bytes.TrimSpace(output), err)

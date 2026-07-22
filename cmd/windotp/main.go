@@ -20,6 +20,8 @@ import (
 
 var version = "dev"
 
+const defaultPopupPrompt = "Please enter 6 digits"
+
 type app struct {
 	stdin  io.Reader
 	stdout io.Writer
@@ -417,7 +419,7 @@ func (a app) popup(args []string) error {
 	interval := fs.Duration("interval", 200*time.Millisecond, "interval between Accessibility checks")
 	delay := fs.Duration("delay", 100*time.Millisecond, "wait after the MFA input appears before typing")
 	trustProfile := fs.Bool("trust-profile", false, "type without verifying that the active tab matches the profile")
-	prompt := fs.String("prompt", "Please enter 6 digits", "text identifying the WindTerm MFA dialog")
+	prompt := fs.String("prompt", defaultPopupPrompt, "text identifying the WindTerm MFA dialog")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -448,7 +450,7 @@ func (a app) popup(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := typer.WaitForPrompt(*prompt, *timeout, *interval); err != nil {
+	if err := typer.WaitForPrompt(popupPromptCandidates(*prompt), *timeout, *interval); err != nil {
 		return err
 	}
 	if !*trustProfile {
@@ -457,6 +459,13 @@ func (a app) popup(args []string) error {
 		}
 	}
 	return a.typeProfile(name, *minValidity, *delay, typer.Options{Enter: *enter})
+}
+
+func popupPromptCandidates(prompt string) []string {
+	if prompt == defaultPopupPrompt {
+		return []string{defaultPopupPrompt, "Please Enter MFA Code"}
+	}
+	return []string{prompt}
 }
 
 func verifyActiveProfile(cfg config.Config, name string) error {

@@ -22,7 +22,7 @@ func TestFrontContextScriptCompiles(t *testing.T) {
 func TestPromptVisibleScriptCompiles(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), "prompt-visible.scpt")
 	cmd := exec.Command("/usr/bin/osacompile", "-l", "JavaScript", "-o", outputPath)
-	cmd.Stdin = bytes.NewBufferString("const expectedPrompt = \"Please enter 6 digits\";\n" + promptVisibleScript)
+	cmd.Stdin = bytes.NewBufferString("const expectedPrompts = [\"Please enter 6 digits\", \"Please Enter MFA Code\"];\n" + promptVisibleScript)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("compile prompt visibility script: %s: %v", bytes.TrimSpace(output), err)
 	}

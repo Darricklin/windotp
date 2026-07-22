@@ -104,7 +104,7 @@ profile，并单独创建规则。
 ### 图形化 MFA 弹窗
 
 `windotp popup` 通过 macOS Accessibility 等待 WindTerm 前台窗口出现包含
-`Please enter 6 digits` 的图形化弹窗和已聚焦的输入框，随后生成验证码、输入并按回车。它不会把
+`Please enter 6 digits` 或 `Please Enter MFA Code` 的图形化弹窗和已聚焦的输入框，随后生成验证码、输入并按回车。它不会把
 终端缓冲区中的相同文字误认为弹窗。填写动态码前，它会自动取消 MFA 弹窗中的
 `Remember this step` / `记住这一步`，防止 WindTerm 保存会过期的一次性验证码。
 

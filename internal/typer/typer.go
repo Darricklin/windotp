@@ -35,10 +35,10 @@ func Context(matches []string) (FrontContext, error) {
 	return platformContext(matches)
 }
 
-func WaitForPrompt(prompt string, timeout, interval time.Duration) error {
+func WaitForPrompt(prompts []string, timeout, interval time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
-		visible, err := platformPromptVisible(prompt)
+		visible, err := platformPromptVisible(prompts)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func WaitForPrompt(prompt string, timeout, interval time.Duration) error {
 			return nil
 		}
 		if time.Now().Add(interval).After(deadline) {
-			return fmt.Errorf("timed out after %s waiting for WindTerm MFA prompt %q", timeout, prompt)
+			return fmt.Errorf("timed out after %s waiting for WindTerm MFA prompts %q", timeout, prompts)
 		}
 		time.Sleep(interval)
 	}

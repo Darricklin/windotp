@@ -184,3 +184,21 @@ func TestPopupValidatesArguments(t *testing.T) {
 		})
 	}
 }
+
+func TestPopupPromptCandidates(t *testing.T) {
+	got := popupPromptCandidates(defaultPopupPrompt)
+	want := []string{"Please enter 6 digits", "Please Enter MFA Code"}
+	if len(got) != len(want) {
+		t.Fatalf("popupPromptCandidates(default) = %q, want %q", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("popupPromptCandidates(default) = %q, want %q", got, want)
+		}
+	}
+
+	custom := popupPromptCandidates("OTP Code")
+	if len(custom) != 1 || custom[0] != "OTP Code" {
+		t.Fatalf("popupPromptCandidates(custom) = %q, want [OTP Code]", custom)
+	}
+}
