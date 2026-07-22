@@ -103,31 +103,43 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
    windotp bind jump1 jump-tap1
    ```
 
-2. 在 WindTerm 中打开 `jump-tap1` 对应 session 的设置，进入 `Trigger` 或 `Triggers` 页面。
-3. 新建一个 Trigger，填写：
+2. 先切换到 `jump-tap1` session，再打开 WindTerm 的 `Session Triggers`（会话触发器）页面。
+   如果当前版本只有全局 `Triggers` 页面，则新建 Trigger 后，把 `Target Sessions`（目标会话）明确
+   选择为 `jump-tap1`，把 `Target Systems`（目标系统）选择为全部系统。
+3. 新建一个 Trigger，确认右上角的启用开关已打开，并填写：
 
    | 字段 | 值 |
    | --- | --- |
-   | Pattern | `Please enter 6 digits\.` |
+   | 名称 | `WindOTP jump1` |
+   | Pattern（格式） | `Please enter 6 digits.` |
+   | Use Regular Expression（使用正则表达式） | 关闭 |
    | 类型 | `运行命令`（Run Command，不要选择“自定义链接”） |
-   | App | `/opt/homebrew/bin/windotp` |
+   | Program/Command（程序） | `/opt/homebrew/bin/windotp` |
    | Arguments | `trigger jump1` |
 
-4. 启用 Trigger，保存 session 设置。
+   `Program/Command` 必须使用 `command -v windotp` 返回的完整路径。程序路径和 Arguments 是两个
+   字段，不要把整条命令全部填到程序路径字段。如果勾选“使用正则表达式”，Pattern 才改为
+   `Please enter 6 digits\.`；没有勾选时保留上表中的普通文本，不能包含反斜杠。
+4. 保存 Trigger 和 session 设置。重新打开会话触发器页面，确认它仍然存在、已启用，而且目标会话
+   是 `jump-tap1`。
 5. 保持 `jump-tap1` tab 在前台，重新发起 JumpServer 登录。当终端显示
    `Please enter 6 digits.` 时，WindOTP 会自动生成验证码、输入并按回车。
 6. 第一次触发时，如果 macOS 请求 WindTerm 的 Automation 或 Accessibility 权限，请允许；如果
    没有弹窗，可在“系统设置 -> 隐私与安全性 -> 辅助功能”中启用 WindTerm，然后重新登录测试。
 
 如果执行后提示 `detected labels` 中只有 `bash - WindTerm`，说明当前 WindTerm 版本没有向 macOS
-暴露 tab 标签。把 Arguments 改为下面的配置即可跳过 tab 标签校验：
+暴露 tab 标签。把 Arguments 改为下面的配置即可跳过 tab 标签校验。下面这条命令会等待 5 秒，
+只填写验证码但不按回车，适合先验证自动触发：
 
 ```text
-Arguments: trigger --trust-profile jump1
+Program/Command: /opt/homebrew/bin/windotp
+Arguments:       trigger --delay=5s --enter=false --trust-profile jump1
 ```
 
 `--trust-profile` 仍会确认 WindTerm 位于前台，但无法确认当前是哪一个 tab。只有在该 session 发起
 登录时始终位于前台的情况下才能使用；后台 session 的 Trigger 可能把验证码输入到当前前台 tab。
+确认能自动填写后，可以去掉 `--enter=false` 以恢复自动回车，并按实际情况缩短或删除
+`--delay=5s`。
 
 ### 配置 jump2
 
@@ -143,7 +155,9 @@ windotp bind jump2 jump-tap2
 Arguments: trigger jump2
 ```
 
-如果 `jump2` 也无法读取 tab 标签，则使用 `trigger --trust-profile jump2`。
+如果 `jump2` 也无法读取 tab 标签，则使用
+`trigger --delay=5s --enter=false --trust-profile jump2`，验证成功后再去掉调试用的延迟和
+`--enter=false`。
 
 ### 自动模式选项
 
@@ -190,7 +204,36 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
 ## 常见问题
 
 - Trigger 完全没有反应：确认 Trigger 类型选择的是“运行命令”（Run Command），不是“自定义链接”，
-  并确认 Trigger 已启用且保存在当前 session。
+  并确认 Trigger 已启用、已保存、目标会话包含当前 session、目标系统为全部系统。Pattern 使用
+  `Please enter 6 digits.` 时应关闭“使用正则表达式”；使用 `Please enter 6 digits\.` 时必须开启。
+- 不确定 WindTerm 是否匹配到了 Pattern：先把 Trigger 临时改成下面的配置，重新触发一次登录：
+
+  ```bash
+  rm -f /tmp/windotp-trigger-fired
+  ```
+
+  ```text
+  Program/Command: /usr/bin/touch
+  Arguments:       /tmp/windotp-trigger-fired
+  ```
+
+  然后在另一个终端检查：
+
+  ```bash
+  test -e /tmp/windotp-trigger-fired && echo fired || echo not-fired
+  ```
+
+  显示 `not-fired` 说明 WindTerm 没有执行 Trigger，应检查 Pattern、启用开关、目标会话和保存状态；
+  显示 `fired` 说明 WindTerm Trigger 正常，应继续检查 WindOTP 的路径、参数和 macOS 权限。
+- WindTerm 已执行 Trigger，但 WindOTP 没有填写：临时使用 `/bin/zsh` 保存错误输出：
+
+  ```text
+  Program/Command: /bin/zsh
+  Arguments:       -lc '/opt/homebrew/bin/windotp trigger --delay=5s --enter=false --trust-profile jump1 >/tmp/windotp-trigger.log 2>&1'
+  ```
+
+  重新触发后运行 `cat /tmp/windotp-trigger.log` 查看具体错误。排查结束后恢复直接执行
+  `/opt/homebrew/bin/windotp`，避免长期保留调试文件。
 - `WindTerm is not the frontmost application`：先点击目标 WindTerm tab，再重新触发登录或按快捷键。
 - `no profile matches the active WindTerm tab`：运行 `windotp list` 检查 profile，再用
   `windotp bind NAME TAB_LABEL` 重新绑定；`TAB_LABEL` 必须出现在当前 tab 标签中。
