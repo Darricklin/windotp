@@ -1,6 +1,10 @@
 package typer
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 var ErrCanceled = errors.New("profile selection canceled")
 
@@ -29,4 +33,21 @@ func Choose(profiles []string, defaultProfile string) (string, error) {
 
 func Context(matches []string) (FrontContext, error) {
 	return platformContext(matches)
+}
+
+func WaitForPrompt(prompt string, timeout, interval time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		visible, err := platformPromptVisible(prompt)
+		if err != nil {
+			return err
+		}
+		if visible {
+			return nil
+		}
+		if time.Now().Add(interval).After(deadline) {
+			return fmt.Errorf("timed out after %s waiting for WindTerm MFA prompt %q", timeout, prompt)
+		}
+		time.Sleep(interval)
+	}
 }

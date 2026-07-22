@@ -161,3 +161,26 @@ func TestTriggerValidatesArguments(t *testing.T) {
 		})
 	}
 }
+
+func TestPopupValidatesArguments(t *testing.T) {
+	t.Setenv("WINDOTP_CONFIG", t.TempDir()+"/config.json")
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "missing profile", args: []string{"popup"}},
+		{name: "negative timeout", args: []string{"popup", "--timeout=-1s", "prod"}},
+		{name: "zero interval", args: []string{"popup", "--interval=0", "prod"}},
+		{name: "negative delay", args: []string{"popup", "--delay=-1ms", "prod"}},
+		{name: "empty prompt", args: []string{"popup", "--prompt=", "prod"}},
+		{name: "invalid minimum validity", args: []string{"popup", "--min-validity=30s", "prod"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := app{stdin: strings.NewReader(""), stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, store: memoryStore{}}
+			if err := a.run(tt.args); err == nil {
+				t.Fatalf("run(%q) unexpectedly succeeded", tt.args)
+			}
+		})
+	}
+}

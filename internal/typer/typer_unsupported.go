@@ -13,6 +13,7 @@ func platformChoose([]string, string) (string, error) {
 	return "", unsupportedError()
 }
 func platformContext([]string) (FrontContext, error) { return FrontContext{}, unsupportedError() }
+func platformPromptVisible(string) (bool, error)     { return false, unsupportedError() }
 
 func unsupportedError() error {
 	return fmt.Errorf("WindTerm typing is only supported on macOS, not %s", runtime.GOOS)

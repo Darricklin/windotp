@@ -5,13 +5,14 @@ WindOTP 是为下面这个固定场景设计的 macOS 命令行工具：
 - WindTerm 通过 SSH 登录 JumpServer
 - JumpServer 显示 `Please enter 6 digits.`
 - Google Authenticator 使用标准 6 位 TOTP
-- 支持 WindTerm 检测提示后自动填写，也支持按快捷键填写
+- 支持 WindTerm 图形化 MFA 弹窗和终端提示自动填写，也支持按快捷键填写
 
 Base32 密钥只存放在 macOS Keychain 中。配置文件仅保存 profile 名称，不保存密钥。
 
 WindOTP 支持两种使用方式，可同时配置：
 
-- 自动填写：WindTerm Trigger 调用 `windotp trigger NAME`
+- 图形化 MFA 弹窗：连接前事件调用 `windotp popup NAME`
+- 终端文字提示：WindTerm Trigger 调用 `windotp trigger NAME`
 - 快捷键填写：Automator 快速操作调用 `windotp auto`
 
 两种方式共用同一套 profile、tab 绑定和 Keychain 密钥。
@@ -92,10 +93,41 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 
 ## 方式一：WindTerm 自动填写
 
-这种方式由每个 WindTerm session 自己检测验证码提示，不需要按快捷键。每个 session 都要绑定
-对应的 profile，并单独创建 Trigger。
+WindTerm 有两种验证码界面，配置方式不同：
 
-### 配置 jump1
+- 中央弹出带输入框的图形化登录窗口：使用 `windotp popup`。
+- `Please enter 6 digits.` 直接显示在终端文字区域：使用 `windotp trigger`。
+
+文字 Trigger 无法读取图形化窗口中的文字。两种方式都不需要按快捷键；每个 session 都要绑定对应的
+profile，并单独创建规则。
+
+### 图形化 MFA 弹窗
+
+`windotp popup` 通过 macOS Accessibility 等待 WindTerm 前台窗口出现包含
+`Please enter 6 digits` 的图形化弹窗和已聚焦的输入框，随后生成验证码、输入并按回车。它不会把
+终端缓冲区中的相同文字误认为弹窗。
+
+以 `jump1` 为例，在 WindTerm 的触发器管理器中新建规则：
+
+| 字段 | 值 |
+| --- | --- |
+| Type | `Before connection` / `连接前` |
+| Action | `Run Command` / `运行命令` |
+| macOS Command | `/opt/homebrew/bin/windotp` |
+| Arguments | `popup --trust-profile --timeout=90s jump1` |
+| Session | 只选择 `jump1` 对应的 WindTerm session |
+
+保存后完全关闭旧 session，再重新打开。连接前事件会启动一次等待任务；MFA 弹窗出现后自动填写。
+安装路径必须以 `command -v windotp` 的输出为准。例如 Intel Homebrew 或迁移过的环境可能应填写
+`/usr/local/bin/windotp`。
+
+如果 WindTerm 能可靠地向 Accessibility 暴露当前 tab 标签，可去掉 `--trust-profile`；否则必须保证
+该 session 在弹窗出现前一直位于前台。等待超时默认是 60 秒，上例放宽为 90 秒。自定义弹窗提示可用
+`--prompt TEXT`。
+
+### 终端文字提示
+
+#### 配置 jump1
 
 1. 确认 `jump1` 已绑定到该 session 的 tab 标签：
 
@@ -141,7 +173,7 @@ Arguments:       trigger --delay=5s --enter=false --trust-profile jump1
 确认能自动填写后，可以去掉 `--enter=false` 以恢复自动回车，并按实际情况缩短或删除
 `--delay=5s`。
 
-### 配置 jump2
+#### 配置 jump2
 
 `jump2` 的配置相同，只需更换 tab 绑定和 Trigger 参数：
 
@@ -159,7 +191,7 @@ Arguments: trigger jump2
 `trigger --delay=5s --enter=false --trust-profile jump2`，验证成功后再去掉调试用的延迟和
 `--enter=false`。
 
-### 自动模式选项
+#### 自动模式选项
 
 - 默认等待 200ms，让 WindTerm 先处理完提示。终端较慢时可把 Arguments 改为
   `trigger --delay 500ms jump1`。
@@ -239,6 +271,10 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
   `windotp bind NAME TAB_LABEL` 重新绑定；`TAB_LABEL` 必须出现在当前 tab 标签中。
 - `detected labels` 只有 `bash - WindTerm` 等通用名称：WindTerm 没有向 Accessibility 暴露 tab
   标签。自动 Trigger 可使用 `trigger --trust-profile NAME`；必须确保触发登录的 session 位于前台。
+- 图形化 MFA 弹窗停住且文字 Trigger 没反应：弹窗文字不属于终端缓冲区。改用连接前事件调用
+  `popup --trust-profile NAME`。
+- `popup` 超时：确认连接前事件确实执行了命令、WindTerm 在前台，并为 WindTerm 授予
+  Accessibility 权限；登录耗时较长时增加 `--timeout`。
 - `cannot read the active WindTerm tab label` 或旧版本显示 `detected labels: []`：快捷键模式需要为
   Automator 授予 Accessibility 权限，Trigger 模式需要为 WindTerm 授权；授权后完全退出并重新打开
   Automator 和 WindTerm。
@@ -261,6 +297,7 @@ windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
 windotp choose [--enter=true] [--min-validity=5s]
 windotp auto [--enter=true] [--min-validity=5s]
 windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] [--trust-profile] NAME
+windotp popup [--enter=true] [--min-validity=5s] [--timeout=60s] [--interval=200ms] [--delay=100ms] [--trust-profile] [--prompt=TEXT] NAME
 windotp remove NAME
 windotp doctor
 windotp version

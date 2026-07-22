@@ -147,6 +147,75 @@ JSON.stringify({
     candidates: candidates
 });`
 
+const promptVisibleScript = `const systemEvents = Application("System Events");
+const windTerm = systemEvents.applicationProcesses.byName("WindTerm");
+
+if (!windTerm.exists() || !windTerm.frontmost()) {
+    JSON.stringify({prompt: false, input: false});
+} else {
+    function safe(call, fallback) {
+        try {
+            return call();
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    let promptFound = false;
+    let inputFound = false;
+    const queue = [];
+    const windows = windTerm.windows();
+    for (let i = 0; i < windows.length; i += 1) {
+        queue.push({element: windows[i], depth: 0});
+    }
+
+    let cursor = 0;
+    let visited = 0;
+    while (cursor < queue.length && visited < 2500 && !(promptFound && inputFound)) {
+        const current = queue[cursor];
+        cursor += 1;
+        visited += 1;
+
+        const element = current.element;
+        const depth = current.depth;
+        const role = safe(() => element.role(), "");
+        const focused = safe(() => element.focused(), false) === true;
+        const editable = safe(() => element.attributes.byName("AXEditable").value(), false) === true;
+
+        if (focused && (editable || role === "AXTextField" || role === "AXSecureTextField" || role === "AXTextArea" || role === "AXComboBox")) {
+            inputFound = true;
+        }
+
+        // Ignore text rendered in the terminal buffer. This command is only
+        // for WindTerm's graphical keyboard-interactive dialog.
+        if (role !== "AXTextArea" && role !== "AXWebArea") {
+            const values = [
+                safe(() => element.name(), ""),
+                safe(() => element.title(), ""),
+                safe(() => element.description(), ""),
+                safe(() => element.help(), ""),
+                safe(() => element.value(), "")
+            ];
+            for (let i = 0; i < values.length; i += 1) {
+                if (typeof values[i] === "string" && values[i].indexOf(expectedPrompt) !== -1) {
+                    promptFound = true;
+                    break;
+                }
+            }
+        }
+
+        const skipChildren = role === "AXTextArea" || role === "AXTable" || role === "AXOutline" || role === "AXWebArea";
+        if (!skipChildren && depth < 16) {
+            const children = safe(() => element.uiElements(), []);
+            for (let i = 0; i < children.length; i += 1) {
+                queue.push({element: children[i], depth: depth + 1});
+            }
+        }
+    }
+
+    JSON.stringify({prompt: promptFound, input: inputFound});
+}`
+
 func platformType(code string, opts Options) error {
 	if !sixDigits.MatchString(code) {
 		return fmt.Errorf("refusing to type a value that is not exactly six digits")
@@ -231,6 +300,27 @@ func platformContext(matches []string) (FrontContext, error) {
 		return FrontContext{}, fmt.Errorf("decode active WindTerm context: %w", err)
 	}
 	return context, nil
+}
+
+func platformPromptVisible(prompt string) (bool, error) {
+	encodedPrompt, err := json.Marshal(prompt)
+	if err != nil {
+		return false, fmt.Errorf("encode MFA prompt: %w", err)
+	}
+	cmd := exec.Command("/usr/bin/osascript", "-l", "JavaScript")
+	cmd.Stdin = bytes.NewBufferString("const expectedPrompt = " + string(encodedPrompt) + ";\n" + promptVisibleScript)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("inspect WindTerm MFA dialog: %s: %w", bytes.TrimSpace(output), err)
+	}
+	var result struct {
+		Prompt bool `json:"prompt"`
+		Input  bool `json:"input"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(output), &result); err != nil {
+		return false, fmt.Errorf("decode WindTerm MFA dialog state: %w", err)
+	}
+	return result.Prompt && result.Input, nil
 }
 
 func platformCheck() error {

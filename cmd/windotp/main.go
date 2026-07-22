@@ -59,6 +59,8 @@ func (a app) run(args []string) error {
 		return a.auto(args[1:])
 	case "trigger":
 		return a.trigger(args[1:])
+	case "popup":
+		return a.popup(args[1:])
 	case "remove":
 		return a.remove(args[1:])
 	case "doctor":
@@ -87,6 +89,7 @@ Usage:
   windotp choose [--enter=true] [--min-validity=5s]
   windotp auto [--enter=true] [--min-validity=5s]
   windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] [--trust-profile] NAME
+  windotp popup [--enter=true] [--min-validity=5s] [--timeout=60s] [--interval=200ms] [--delay=100ms] [--trust-profile] NAME
   windotp remove NAME
   windotp doctor
   windotp version
@@ -393,29 +396,86 @@ func (a app) trigger(args []string) error {
 	if err != nil {
 		return err
 	}
-	match := cfg.Profiles[name].Match
-	if match == "" {
-		match = name
-	}
 
 	if *delay > 0 {
 		time.Sleep(*delay)
 	}
-	if *trustProfile {
-		return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
+	if !*trustProfile {
+		if err := verifyActiveProfile(cfg, name); err != nil {
+			return err
+		}
+	}
+	return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
+}
+
+func (a app) popup(args []string) error {
+	fs := flag.NewFlagSet("popup", flag.ContinueOnError)
+	fs.SetOutput(a.stderr)
+	enter := fs.Bool("enter", true, "press Enter after typing")
+	minValidity := fs.Duration("min-validity", 5*time.Second, "wait for a new code when less validity remains")
+	timeout := fs.Duration("timeout", 60*time.Second, "maximum time to wait for the WindTerm MFA dialog")
+	interval := fs.Duration("interval", 200*time.Millisecond, "interval between Accessibility checks")
+	delay := fs.Duration("delay", 100*time.Millisecond, "wait after the MFA input appears before typing")
+	trustProfile := fs.Bool("trust-profile", false, "type without verifying that the active tab matches the profile")
+	prompt := fs.String("prompt", "Please enter 6 digits", "text identifying the WindTerm MFA dialog")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("usage: windotp popup [OPTIONS] NAME")
+	}
+	if *minValidity < 0 || *minValidity >= totp.Period {
+		return fmt.Errorf("min-validity must be between 0 and %s", totp.Period)
+	}
+	if *timeout <= 0 {
+		return fmt.Errorf("timeout must be greater than zero")
+	}
+	if *interval <= 0 {
+		return fmt.Errorf("interval must be greater than zero")
+	}
+	if *delay < 0 {
+		return fmt.Errorf("delay must not be negative")
+	}
+	if strings.TrimSpace(*prompt) == "" {
+		return fmt.Errorf("prompt must not be empty")
+	}
+
+	_, cfg, err := a.load()
+	if err != nil {
+		return err
+	}
+	name, err := cfg.Resolve(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	if err := typer.WaitForPrompt(*prompt, *timeout, *interval); err != nil {
+		return err
+	}
+	if !*trustProfile {
+		if err := verifyActiveProfile(cfg, name); err != nil {
+			return err
+		}
+	}
+	return a.typeProfile(name, *minValidity, *delay, typer.Options{Enter: *enter})
+}
+
+func verifyActiveProfile(cfg config.Config, name string) error {
+	match := cfg.Profiles[name].Match
+	if match == "" {
+		match = name
 	}
 	context, err := typer.Context([]string{match})
 	if err != nil {
 		return err
 	}
 	sources := append([]string{context.Window}, context.Candidates...)
-	if !matchesProfile(match, sources) {
-		if len(nonEmpty(sources)) == 0 {
-			return fmt.Errorf("cannot read the active WindTerm tab label; grant Accessibility access to WindTerm for triggers or Automator for shortcuts, then restart that application")
-		}
-		return fmt.Errorf("trigger for profile %q does not match the active WindTerm tab; detected labels: %q; if WindTerm does not expose tab labels, use --trust-profile only when this session is kept in the foreground", name, nonEmpty(sources))
+	if matchesProfile(match, sources) {
+		return nil
 	}
-	return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
+	if len(nonEmpty(sources)) == 0 {
+		return fmt.Errorf("cannot read the active WindTerm tab label; grant Accessibility access to WindTerm for triggers or Automator for shortcuts, then restart that application")
+	}
+	return fmt.Errorf("trigger for profile %q does not match the active WindTerm tab; detected labels: %q; if WindTerm does not expose tab labels, use --trust-profile only when this session is kept in the foreground", name, nonEmpty(sources))
 }
 
 func matchProfile(cfg config.Config, sources []string) (string, error) {
