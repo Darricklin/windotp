@@ -119,6 +119,16 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 6. 第一次触发时，如果 macOS 请求 WindTerm 的 Automation 或 Accessibility 权限，请允许；如果
    没有弹窗，可在“系统设置 -> 隐私与安全性 -> 辅助功能”中启用 WindTerm，然后重新登录测试。
 
+如果执行后提示 `detected labels` 中只有 `bash - WindTerm`，说明当前 WindTerm 版本没有向 macOS
+暴露 tab 标签。把 Arguments 改为下面的配置即可跳过 tab 标签校验：
+
+```text
+Arguments: trigger --trust-profile jump1
+```
+
+`--trust-profile` 仍会确认 WindTerm 位于前台，但无法确认当前是哪一个 tab。只有在该 session 发起
+登录时始终位于前台的情况下才能使用；后台 session 的 Trigger 可能把验证码输入到当前前台 tab。
+
 ### 配置 jump2
 
 `jump2` 的配置相同，只需更换 tab 绑定和 Trigger 参数：
@@ -133,6 +143,8 @@ windotp bind jump2 jump-tap2
 Arguments: trigger jump2
 ```
 
+如果 `jump2` 也无法读取 tab 标签，则使用 `trigger --trust-profile jump2`。
+
 ### 自动模式选项
 
 - 默认等待 200ms，让 WindTerm 先处理完提示。终端较慢时可把 Arguments 改为
@@ -140,6 +152,7 @@ Arguments: trigger jump2
 - 不希望自动按回车时，使用 `trigger --enter=false jump1`。
 - Trigger 只处理它绑定的 profile。当前 tab 标签不匹配时会拒绝输入，避免把验证码发到错误 session。
 - 后台 tab 触发时也会拒绝输入。切换到对应 tab 后，重新发起登录即可。
+- `--trust-profile` 会关闭上面两项 tab 保护，只应作为 WindTerm 不暴露 tab 标签时的兼容模式。
 
 不要让多个 Trigger 使用同一个 profile 参数。例如 `jump-tap2` session 不应配置
 `trigger jump1`。
@@ -179,6 +192,8 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
 - `WindTerm is not the frontmost application`：先点击目标 WindTerm tab，再重新触发登录或按快捷键。
 - `no profile matches the active WindTerm tab`：运行 `windotp list` 检查 profile，再用
   `windotp bind NAME TAB_LABEL` 重新绑定；`TAB_LABEL` 必须出现在当前 tab 标签中。
+- `detected labels` 只有 `bash - WindTerm` 等通用名称：WindTerm 没有向 Accessibility 暴露 tab
+  标签。自动 Trigger 可使用 `trigger --trust-profile NAME`；必须确保触发登录的 session 位于前台。
 - `cannot read the active WindTerm tab label` 或旧版本显示 `detected labels: []`：快捷键模式需要为
   Automator 授予 Accessibility 权限，Trigger 模式需要为 WindTerm 授权；授权后完全退出并重新打开
   Automator 和 WindTerm。
@@ -200,7 +215,7 @@ windotp code [NAME]
 windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
 windotp choose [--enter=true] [--min-validity=5s]
 windotp auto [--enter=true] [--min-validity=5s]
-windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] NAME
+windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] [--trust-profile] NAME
 windotp remove NAME
 windotp doctor
 windotp version

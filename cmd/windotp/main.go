@@ -86,7 +86,7 @@ Usage:
   windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
   windotp choose [--enter=true] [--min-validity=5s]
   windotp auto [--enter=true] [--min-validity=5s]
-  windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] NAME
+  windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] [--trust-profile] NAME
   windotp remove NAME
   windotp doctor
   windotp version
@@ -371,6 +371,7 @@ func (a app) trigger(args []string) error {
 	enter := fs.Bool("enter", true, "press Enter after typing")
 	minValidity := fs.Duration("min-validity", 5*time.Second, "wait for a new code when less validity remains")
 	delay := fs.Duration("delay", 200*time.Millisecond, "wait for WindTerm to finish handling the prompt")
+	trustProfile := fs.Bool("trust-profile", false, "type without verifying that the active tab matches the profile")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -400,6 +401,9 @@ func (a app) trigger(args []string) error {
 	if *delay > 0 {
 		time.Sleep(*delay)
 	}
+	if *trustProfile {
+		return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
+	}
 	context, err := typer.Context([]string{match})
 	if err != nil {
 		return err
@@ -409,7 +413,7 @@ func (a app) trigger(args []string) error {
 		if len(nonEmpty(sources)) == 0 {
 			return fmt.Errorf("cannot read the active WindTerm tab label; grant Accessibility access to WindTerm for triggers or Automator for shortcuts, then restart that application")
 		}
-		return fmt.Errorf("trigger for profile %q does not match the active WindTerm tab; detected labels: %q", name, nonEmpty(sources))
+		return fmt.Errorf("trigger for profile %q does not match the active WindTerm tab; detected labels: %q; if WindTerm does not expose tab labels, use --trust-profile only when this session is kept in the foreground", name, nonEmpty(sources))
 	}
 	return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
 }

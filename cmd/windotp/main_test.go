@@ -148,6 +148,7 @@ func TestTriggerValidatesArguments(t *testing.T) {
 		args []string
 	}{
 		{name: "missing profile", args: []string{"trigger"}},
+		{name: "trusted trigger still requires profile", args: []string{"trigger", "--trust-profile"}},
 		{name: "negative delay", args: []string{"trigger", "--delay=-1ms", "prod"}},
 		{name: "invalid minimum validity", args: []string{"trigger", "--min-validity=30s", "prod"}},
 	}
