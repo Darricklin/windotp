@@ -105,7 +105,8 @@ profile，并单独创建规则。
 
 `windotp popup` 通过 macOS Accessibility 等待 WindTerm 前台窗口出现包含
 `Please enter 6 digits` 的图形化弹窗和已聚焦的输入框，随后生成验证码、输入并按回车。它不会把
-终端缓冲区中的相同文字误认为弹窗。
+终端缓冲区中的相同文字误认为弹窗。填写动态码前，它会自动取消 MFA 弹窗中的
+`Remember this step` / `记住这一步`，防止 WindTerm 保存会过期的一次性验证码。
 
 以 `jump1` 为例，在 WindTerm 的触发器管理器中新建规则：
 
@@ -120,6 +121,10 @@ profile，并单独创建规则。
 保存后完全关闭旧 session，再重新打开。连接前事件会启动一次等待任务；MFA 弹窗出现后自动填写。
 安装路径必须以 `command -v windotp` 的输出为准。例如 Intel Homebrew 或迁移过的环境可能应填写
 `/usr/local/bin/windotp`。
+
+如果旧版本已经让 WindTerm 保存了过期 MFA，升级后需要在 `SSH > 验证 > 已保存自动认证`
+点击一次 `清除`，然后重新连接。账号和固定密码可以继续保存，只有 MFA 这一步必须保持未勾选；
+后续双击 session 时，WindTerm 使用已保存的固定凭据，`windotp popup` 填写当前动态码。
 
 如果 WindTerm 能可靠地向 Accessibility 暴露当前 tab 标签，可去掉 `--trust-profile`；否则必须保证
 该 session 在弹窗出现前一直位于前台。等待超时默认是 60 秒，上例放宽为 90 秒。自定义弹窗提示可用

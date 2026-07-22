@@ -151,7 +151,7 @@ const promptVisibleScript = `const systemEvents = Application("System Events");
 const windTerm = systemEvents.applicationProcesses.byName("WindTerm");
 
 if (!windTerm.exists() || !windTerm.frontmost()) {
-    JSON.stringify({prompt: false, input: false});
+    JSON.stringify({prompt: false, input: false, rememberFound: false, rememberCleared: false});
 } else {
     function safe(call, fallback) {
         try {
@@ -161,17 +161,74 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
         }
     }
 
-    let promptFound = false;
-    let inputFound = false;
-    const queue = [];
-    const windows = windTerm.windows();
-    for (let i = 0; i < windows.length; i += 1) {
-        queue.push({element: windows[i], depth: 0});
+    function isMFAInput(element) {
+        const role = safe(() => element.role(), "");
+        if (role === "AXTextArea" || role === "AXWebArea") {
+            return false;
+        }
+        const editable = safe(() => element.attributes.byName("AXEditable").value(), false) === true;
+        return editable || role === "AXTextField" || role === "AXSecureTextField" || role === "AXComboBox";
     }
 
+    function isChecked(value) {
+        return value === true || value === 1 || value === "1" || value === "true" || value === "checked";
+    }
+
+    function elementValues(element, includeValue) {
+        const values = [
+            safe(() => element.name(), ""),
+            safe(() => element.title(), ""),
+            safe(() => element.description(), ""),
+            safe(() => element.help(), "")
+        ];
+        if (includeValue) {
+            values.push(safe(() => element.value(), ""));
+        }
+        return values;
+    }
+
+    function isRememberCheckbox(element, role) {
+        if (role !== "AXCheckBox") {
+            return false;
+        }
+        const values = elementValues(element, false);
+        for (let i = 0; i < values.length; i += 1) {
+            if (typeof values[i] !== "string") {
+                continue;
+            }
+            const normalized = values[i].toLowerCase();
+            if (normalized.indexOf("remember this step") !== -1 || values[i].indexOf("记住这一步") !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    let promptFound = false;
+    let rememberFound = false;
+    let rememberCleared = false;
+    const focusedInput = safe(() => windTerm.attributes.byName("AXFocusedUIElement").value(), null);
+    // The terminal buffer is normally the focused AXTextArea. Ignoring it
+    // makes checks before the MFA dialog appears effectively constant-time.
+    const inputFound = focusedInput !== null && isMFAInput(focusedInput);
+    let focusedContainer = null;
+
+    if (inputFound) {
+        let current = focusedInput;
+        for (let depth = 0; current !== null && depth < 16; depth += 1) {
+            focusedContainer = current;
+            const role = safe(() => current.role(), "");
+            if (role === "AXSheet" || role === "AXDialog" || role === "AXWindow") {
+                break;
+            }
+            current = safe(() => current.attributes.byName("AXParent").value(), null);
+        }
+    }
+
+    const queue = focusedContainer === null ? [] : [{element: focusedContainer, depth: 0}];
     let cursor = 0;
     let visited = 0;
-    while (cursor < queue.length && visited < 2500 && !(promptFound && inputFound)) {
+    while (cursor < queue.length && visited < 1000 && !(promptFound && rememberCleared)) {
         const current = queue[cursor];
         cursor += 1;
         visited += 1;
@@ -179,23 +236,31 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
         const element = current.element;
         const depth = current.depth;
         const role = safe(() => element.role(), "");
-        const focused = safe(() => element.focused(), false) === true;
-        const editable = safe(() => element.attributes.byName("AXEditable").value(), false) === true;
 
-        if (focused && (editable || role === "AXTextField" || role === "AXSecureTextField" || role === "AXTextArea" || role === "AXComboBox")) {
-            inputFound = true;
+        if (isRememberCheckbox(element, role)) {
+            rememberFound = true;
+            const value = safe(() => element.value(), false);
+            if (!isChecked(value)) {
+                rememberCleared = true;
+            } else {
+                let pressed = safe(() => {
+                    element.actions.byName("AXPress").perform();
+                    return true;
+                }, false);
+                if (!pressed) {
+                    pressed = safe(() => {
+                        element.click();
+                        return true;
+                    }, false);
+                }
+                rememberCleared = pressed;
+            }
         }
 
         // Ignore text rendered in the terminal buffer. This command is only
         // for WindTerm's graphical keyboard-interactive dialog.
         if (role !== "AXTextArea" && role !== "AXWebArea") {
-            const values = [
-                safe(() => element.name(), ""),
-                safe(() => element.title(), ""),
-                safe(() => element.description(), ""),
-                safe(() => element.help(), ""),
-                safe(() => element.value(), "")
-            ];
+            const values = elementValues(element, true);
             for (let i = 0; i < values.length; i += 1) {
                 if (typeof values[i] === "string" && values[i].indexOf(expectedPrompt) !== -1) {
                     promptFound = true;
@@ -213,7 +278,12 @@ if (!windTerm.exists() || !windTerm.frontmost()) {
         }
     }
 
-    JSON.stringify({prompt: promptFound, input: inputFound});
+    JSON.stringify({
+        prompt: promptFound,
+        input: inputFound,
+        rememberFound: rememberFound,
+        rememberCleared: rememberCleared
+    });
 }`
 
 func platformType(code string, opts Options) error {
@@ -314,13 +384,18 @@ func platformPromptVisible(prompt string) (bool, error) {
 		return false, fmt.Errorf("inspect WindTerm MFA dialog: %s: %w", bytes.TrimSpace(output), err)
 	}
 	var result struct {
-		Prompt bool `json:"prompt"`
-		Input  bool `json:"input"`
+		Prompt          bool `json:"prompt"`
+		Input           bool `json:"input"`
+		RememberFound   bool `json:"rememberFound"`
+		RememberCleared bool `json:"rememberCleared"`
 	}
 	if err := json.Unmarshal(bytes.TrimSpace(output), &result); err != nil {
 		return false, fmt.Errorf("decode WindTerm MFA dialog state: %w", err)
 	}
-	return result.Prompt && result.Input, nil
+	if result.Prompt && result.Input && result.RememberFound && !result.RememberCleared {
+		return false, fmt.Errorf("WindTerm MFA dialog is ready, but cannot clear Remember this step; grant Accessibility access and retry")
+	}
+	return result.Prompt && result.Input && result.RememberFound && result.RememberCleared, nil
 }
 
 func platformCheck() error {
