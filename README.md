@@ -43,8 +43,9 @@ windotp bind jump2 jump-tap2
 windotp list
 ```
 
-`bind` 的第二个参数使用 WindTerm 顶部 tab 显示的名称。以后每增加一台 JumpServer，只需要执行
-一次 `add` 和一次 `bind`，Automator 与快捷键无需修改。
+`bind` 的第二个参数使用 WindTerm 顶部 tab 显示的名称。以后每增加一台 JumpServer，都需要执行
+一次 `add` 和一次 `bind`。快捷键模式无需修改 Automator；自动模式还需要为新 session 添加一个
+Trigger。
 
 也可以从密码管理器通过 stdin 导入 Base32 或 `otpauth://` URL：
 
@@ -54,65 +55,136 @@ password-command | windotp add --stdin jump1
 
 WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell history 或其他进程读取。
 
-## 手动验证
+## 使用前检查
 
-先在终端验证 TOTP 是否正确：
+1. 确认 WindOTP 的安装路径，后面的 WindTerm 和 Automator 配置会用到：
 
-```bash
-windotp code jump1
-```
+   ```bash
+   command -v windotp
+   ```
 
-`windotp trigger` 和 `windotp auto` 必须由 WindTerm Trigger 或下面的 Automator 快速操作调用。
-不要从 Terminal 手动调用，因为此时 Terminal 而不是 WindTerm 位于前台。
+   Apple Silicon Homebrew 通常返回 `/opt/homebrew/bin/windotp`，Intel Mac 通常返回
+   `/usr/local/bin/windotp`。以下示例使用 `/opt/homebrew/bin/windotp`，请按实际结果替换。
 
-首次输入时，macOS 可能要求 Automation 或 Accessibility 权限。按系统提示授权运行命令的
-WindTerm、Terminal 或 Automator，然后执行：
+2. 确认 profile 和默认 profile：
 
-```bash
-windotp doctor
-```
+   ```bash
+   windotp list
+   ```
+
+3. 在终端中生成一次验证码，和 Google Authenticator 当前显示的验证码比较：
+
+   ```bash
+   windotp code jump1
+   ```
+
+4. 检查配置文件、Keychain 和 macOS Accessibility：
+
+   ```bash
+   windotp doctor
+   ```
+
+   如果 macOS 弹出 Automation 或 Accessibility 请求，请允许 Terminal 控制 System Events。
+   也可以在“系统设置 -> 隐私与安全性 -> 辅助功能”中手动启用 Terminal。
+
+`windotp trigger` 和 `windotp auto` 会向当前前台应用发送按键，不能直接在 Terminal 中手动运行；
+下面两种入口都会在输入前校验 WindTerm 是否位于前台。
 
 ## 方式一：WindTerm 自动填写
 
-WindTerm 的 Trigger 可以在检测到登录提示后自动运行 WindOTP，不需要按快捷键。为每个 session
-创建一个 Trigger：
+这种方式由每个 WindTerm session 自己检测验证码提示，不需要按快捷键。每个 session 都要绑定
+对应的 profile，并单独创建 Trigger。
 
-- Pattern: `Please enter 6 digits\.`
-- Action: Run App
-- App: `/opt/homebrew/bin/windotp`
-- Arguments: `trigger jump1`
+### 配置 jump1
 
-`jump1` 替换为该 session 对应的 profile；用 `command -v windotp` 确认实际安装路径。默认等待
-200ms，让 WindTerm 先处理完提示，再核对当前选中 tab 的绑定并填写验证码。可用
-`trigger --delay 500ms jump1` 调整等待时间。
+1. 确认 `jump1` 已绑定到该 session 的 tab 标签：
 
-如果 Trigger 来自后台 tab，或当前 tab 与 profile 不匹配，WindOTP 会拒绝输入，避免把验证码发送到
-错误的 session。切换到对应 tab 后重新发起登录即可。
+   ```bash
+   windotp bind jump1 jump-tap1
+   ```
+
+2. 在 WindTerm 中打开 `jump-tap1` 对应 session 的设置，进入 `Trigger` 或 `Triggers` 页面。
+3. 新建一个 Trigger，填写：
+
+   | 字段 | 值 |
+   | --- | --- |
+   | Pattern | `Please enter 6 digits\.` |
+   | Action | `Run App` |
+   | App | `/opt/homebrew/bin/windotp` |
+   | Arguments | `trigger jump1` |
+
+4. 启用 Trigger，保存 session 设置。
+5. 保持 `jump-tap1` tab 在前台，重新发起 JumpServer 登录。当终端显示
+   `Please enter 6 digits.` 时，WindOTP 会自动生成验证码、输入并按回车。
+6. 第一次触发时，如果 macOS 请求 WindTerm 的 Automation 或 Accessibility 权限，请允许；如果
+   没有弹窗，可在“系统设置 -> 隐私与安全性 -> 辅助功能”中启用 WindTerm，然后重新登录测试。
+
+### 配置 jump2
+
+`jump2` 的配置相同，只需更换 tab 绑定和 Trigger 参数：
+
+```bash
+windotp bind jump2 jump-tap2
+```
+
+在 `jump-tap2` session 的 Trigger 中使用：
+
+```text
+Arguments: trigger jump2
+```
+
+### 自动模式选项
+
+- 默认等待 200ms，让 WindTerm 先处理完提示。终端较慢时可把 Arguments 改为
+  `trigger --delay 500ms jump1`。
+- 不希望自动按回车时，使用 `trigger --enter=false jump1`。
+- Trigger 只处理它绑定的 profile。当前 tab 标签不匹配时会拒绝输入，避免把验证码发到错误 session。
+- 后台 tab 触发时也会拒绝输入。切换到对应 tab 后，重新发起登录即可。
+
+不要让多个 Trigger 使用同一个 profile 参数。例如 `jump-tap2` session 不应配置
+`trigger jump1`。
 
 ## 方式二：快捷键填写
 
 使用 macOS 自带的 Automator。“快捷指令”的 Shell 操作运行在沙箱中，可能无法读取登录
-Keychain，因此不适合作为 WindOTP 的入口。
+Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个快速操作和一个快捷键，WindOTP
+会根据当前选中 tab 的标签自动选择 profile。
 
 1. 打开 Automator，新建“快速操作”。
 2. 设置“工作流程收到当前：没有输入”“位于：任何应用程序”。
-3. 添加“运行 Shell 脚本”。
-4. 填写下面的命令，并将用户名和安装路径替换为实际值：
+3. 添加“运行 Shell 脚本”，Shell 选择 `/bin/zsh`。
+4. 填写下面的命令，把用户名和 `command -v windotp` 返回的安装路径替换为实际值：
 
    ```bash
-   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /usr/local/bin/windotp auto
+   WINDOTP_CONFIG="/Users/你的用户名/Library/Application Support/windotp/config.json" /opt/homebrew/bin/windotp auto
    ```
 
 5. 保存为 `WindOTP`。
 6. 打开“系统设置 → 键盘 → 键盘快捷键 → 服务 → 通用”。
 7. 勾选该服务，双击右侧空白处并按下快捷键，例如 `Control-Option-P`。
+8. 回到 WindTerm，选中 `jump-tap1` 或 `jump-tap2` tab，发起登录。看到
+   `Please enter 6 digits.` 后按快捷键，WindOTP 会自动识别 tab、输入验证码并按回车。
+9. 第一次使用时，如果 macOS 请求 Automator、Automator Runner 或 System Events 权限，请允许；
+   也可在“系统设置 -> 隐私与安全性 -> 辅助功能”中手动启用对应项目。
 
-使用 `command -v windotp` 可确认实际安装路径。所有 JumpServer profile 共用这一个 Automator
-快速操作和一个快捷键。WindOTP 根据 WindTerm 当前选中 tab 的标签自动匹配 profile，不弹出列表；
-无法唯一匹配时会拒绝输入。
+快捷键模式默认自动按回车。不希望自动按回车时，把 Automator 命令末尾改为
+`windotp auto --enter=false`。无法唯一匹配当前 tab 时，WindOTP 会拒绝输入，不会弹出 profile
+列表。
 
 实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。在 M5 Mac、WindTerm 和多个 profile
 的实际环境中，从按下快捷键到填写验证码约需 1 秒。
+
+## 常见问题
+
+- `WindTerm is not the frontmost application`：先点击目标 WindTerm tab，再重新触发登录或按快捷键。
+- `no profile matches the active WindTerm tab`：运行 `windotp list` 检查 profile，再用
+  `windotp bind NAME TAB_LABEL` 重新绑定；`TAB_LABEL` 必须出现在当前 tab 标签中。
+- `active WindTerm tab matches multiple profiles`：不同 profile 的绑定内容有重叠，改用更完整、唯一的
+  tab 标签，例如 `jump-tap1` 和 `jump-tap2`。
+- Accessibility 报错：在“系统设置 -> 隐私与安全性 -> 辅助功能”中允许实际调用 WindOTP 的
+  Terminal、WindTerm 或 Automator，然后完全退出并重新打开对应应用。
+- 验证码不正确：先运行 `windotp code NAME` 与 Google Authenticator 对比，并确认 Mac 的日期与时间
+  设置为自动同步。
 
 ## 命令
 
