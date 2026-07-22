@@ -93,10 +93,10 @@ func TestAddRejectsSecretArgument(t *testing.T) {
 
 func TestMatchProfile(t *testing.T) {
 	cfg := config.New()
-	cfg.Profiles["jump1"] = config.Profile{CreatedAt: time.Now(), Match: "jump-bj.sensetime.com"}
-	cfg.Profiles["jump2"] = config.Profile{CreatedAt: time.Now(), Match: "jump-sh.sensetime.com"}
+	cfg.Profiles["jump1"] = config.Profile{CreatedAt: time.Now(), Match: "jump-tap1"}
+	cfg.Profiles["jump2"] = config.Profile{CreatedAt: time.Now(), Match: "jump-tap2"}
 
-	got, err := matchProfile(cfg, []string{"WindTerm", "jump-bj.sensetime.com"})
+	got, err := matchProfile(cfg, []string{"WindTerm", "jump-tap1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,14 +107,17 @@ func TestMatchProfile(t *testing.T) {
 
 func TestMatchProfileRejectsMissingAndAmbiguousMatches(t *testing.T) {
 	cfg := config.New()
-	cfg.Profiles["jump"] = config.Profile{Match: "sensetime.com"}
-	cfg.Profiles["jump-bj"] = config.Profile{Match: "jump-bj.sensetime.com"}
+	cfg.Profiles["jump"] = config.Profile{Match: "jump-tap"}
+	cfg.Profiles["jump1"] = config.Profile{Match: "jump-tap1"}
 
 	if _, err := matchProfile(cfg, []string{"unrelated.example.com"}); err == nil {
 		t.Fatal("missing match unexpectedly succeeded")
 	}
-	if _, err := matchProfile(cfg, []string{"jump-bj.sensetime.com"}); err == nil {
+	if _, err := matchProfile(cfg, []string{"jump-tap1"}); err == nil {
 		t.Fatal("ambiguous match unexpectedly succeeded")
+	}
+	if _, err := matchProfile(cfg, []string{"", ""}); err == nil || !strings.Contains(err.Error(), "cannot read the active WindTerm tab label") {
+		t.Fatalf("empty labels returned unexpected error: %v", err)
 	}
 }
 
@@ -125,9 +128,9 @@ func TestMatchesProfile(t *testing.T) {
 		sources []string
 		want    bool
 	}{
-		{name: "selected tab", match: "jump-bj.sensetime.com", sources: []string{"WindTerm", "jump-bj.sensetime.com"}, want: true},
-		{name: "case insensitive", match: "JUMP-BJ", sources: []string{"jump-bj.sensetime.com"}, want: true},
-		{name: "different tab", match: "jump-bj", sources: []string{"jump-sh.sensetime.com"}, want: false},
+		{name: "selected tab", match: "jump-tap1", sources: []string{"WindTerm", "jump-tap1"}, want: true},
+		{name: "case insensitive", match: "JUMP-TAP1", sources: []string{"jump-tap1"}, want: true},
+		{name: "different tab", match: "jump-tap1", sources: []string{"jump-tap2"}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

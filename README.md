@@ -179,6 +179,9 @@ Keychain，因此不适合作为 WindOTP 的入口。所有 profile 共用一个
 - `WindTerm is not the frontmost application`：先点击目标 WindTerm tab，再重新触发登录或按快捷键。
 - `no profile matches the active WindTerm tab`：运行 `windotp list` 检查 profile，再用
   `windotp bind NAME TAB_LABEL` 重新绑定；`TAB_LABEL` 必须出现在当前 tab 标签中。
+- `cannot read the active WindTerm tab label` 或旧版本显示 `detected labels: []`：快捷键模式需要为
+  Automator 授予 Accessibility 权限，Trigger 模式需要为 WindTerm 授权；授权后完全退出并重新打开
+  Automator 和 WindTerm。
 - `active WindTerm tab matches multiple profiles`：不同 profile 的绑定内容有重叠，改用更完整、唯一的
   tab 标签，例如 `jump-tap1` 和 `jump-tap2`。
 - Accessibility 报错：在“系统设置 -> 隐私与安全性 -> 辅助功能”中允许实际调用 WindOTP 的

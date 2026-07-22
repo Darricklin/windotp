@@ -406,6 +406,9 @@ func (a app) trigger(args []string) error {
 	}
 	sources := append([]string{context.Window}, context.Candidates...)
 	if !matchesProfile(match, sources) {
+		if len(nonEmpty(sources)) == 0 {
+			return fmt.Errorf("cannot read the active WindTerm tab label; grant Accessibility access to WindTerm for triggers or Automator for shortcuts, then restart that application")
+		}
 		return fmt.Errorf("trigger for profile %q does not match the active WindTerm tab; detected labels: %q", name, nonEmpty(sources))
 	}
 	return a.typeProfile(name, *minValidity, 0, typer.Options{Enter: *enter})
@@ -423,7 +426,11 @@ func matchProfile(cfg config.Config, sources []string) (string, error) {
 		}
 	}
 	if len(matched) == 0 {
-		return "", fmt.Errorf("no profile matches the active WindTerm tab; detected labels: %q", nonEmpty(sources))
+		labels := nonEmpty(sources)
+		if len(labels) == 0 {
+			return "", fmt.Errorf("cannot read the active WindTerm tab label; grant Accessibility access to Automator, then restart Automator and WindTerm")
+		}
+		return "", fmt.Errorf("no profile matches the active WindTerm tab; detected labels: %q", labels)
 	}
 	if len(matched) > 1 {
 		return "", fmt.Errorf("active WindTerm tab matches multiple profiles: %s", strings.Join(matched, ", "))

@@ -64,36 +64,80 @@ function addCandidate(value) {
     }
 }
 
-const windowName = safe(() => frontWindow.name(), "");
-if (matchesProfile(windowName)) {
-    matched = true;
+function elementTexts(element, includeValue) {
+    const values = [
+        safe(() => element.name(), ""),
+        safe(() => element.title(), ""),
+        safe(() => element.description(), ""),
+        safe(() => element.help(), "")
+    ];
+    if (includeValue) {
+        values.push(safe(() => element.value(), ""));
+    }
+    const texts = [];
+    for (let i = 0; i < values.length; i += 1) {
+        if (typeof values[i] === "string" && values[i].length > 0) {
+            texts.push(values[i]);
+        }
+    }
+    return texts;
 }
 
-const queue = [{element: frontWindow, depth: 0}];
+function addElementCandidates(element, includeValue) {
+    const texts = elementTexts(element, includeValue);
+    for (let i = 0; i < texts.length; i += 1) {
+        addCandidate(texts[i]);
+    }
+    return texts;
+}
+
+const windowTexts = [
+    safe(() => frontWindow.name(), ""),
+    safe(() => frontWindow.title(), "")
+].filter((value) => typeof value === "string" && value.length > 0);
+const windowName = windowTexts.length > 0 ? windowTexts[0] : "";
+for (let i = 0; i < windowTexts.length; i += 1) {
+    addCandidate(windowTexts[i]);
+}
+
+const queue = [{element: frontWindow, depth: 0, labelDepth: 0}];
+const menuBars = safe(() => windTerm.menuBars(), []);
+for (let i = 0; i < menuBars.length; i += 1) {
+    queue.push({element: menuBars[i], depth: 0, labelDepth: 0});
+}
 let cursor = 0;
-while (!matched && cursor < queue.length && visited < 800) {
+while (!matched && cursor < queue.length && visited < 1200) {
     const current = queue[cursor];
     cursor += 1;
     const element = current.element;
     const depth = current.depth;
+    const labelDepth = current.labelDepth;
     visited += 1;
     const role = safe(() => element.role(), "");
-    const name = safe(() => element.name(), "");
     const focused = safe(() => element.focused(), false) === true;
     const selected = safe(() => element.selected(), false) === true;
     let activeControl = false;
-    if (role === "AXRadioButton" || role === "AXTab" || role === "AXButton" || role === "AXCheckBox") {
+    if (role === "AXRadioButton" || role === "AXTab" || role === "AXButton" || role === "AXCheckBox" || role === "AXMenuItem") {
         const value = safe(() => element.value(), 0);
         activeControl = value === 1 || value === true || value === "1";
     }
-    if (focused || selected || activeControl) {
-        addCandidate(name);
+    if (role === "AXMenuItem" && !activeControl) {
+        const mark = safe(() => element.attributes.byName("AXMenuItemMarkChar").value(), "");
+        activeControl = typeof mark === "string" && mark.length > 0;
+    }
+    if (focused || selected || activeControl || labelDepth > 0) {
+        const includeValue = role !== "AXTextArea" && role !== "AXWebArea";
+        addElementCandidates(element, includeValue);
     }
     const skipChildren = role === "AXTextArea" || role === "AXTable" || role === "AXOutline" || role === "AXWebArea";
     if (!matched && !skipChildren && depth < 12) {
         const children = safe(() => element.uiElements(), []);
+        let childLabelDepth = labelDepth > 0 ? labelDepth - 1 : 0;
+        if (selected || activeControl) {
+            childLabelDepth = 3;
+        }
         for (let i = 0; i < children.length; i += 1) {
-            queue.push({element: children[i], depth: depth + 1});
+            queue.push({element: children[i], depth: depth + 1, labelDepth: childLabelDepth});
         }
     }
 }
