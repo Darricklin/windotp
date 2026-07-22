@@ -31,8 +31,8 @@ Homebrew 6 不再接受仓库内的本地 Formula；项目建立独立 Homebrew 
 ```bash
 windotp add --default jump1
 windotp add jump2
-windotp bind jump1 jump-bj.sensetime.com
-windotp bind jump2 jump-sh.sensetime.com
+windotp bind jump1 jump-tap1
+windotp bind jump2 jump-tap2
 windotp list
 ```
 
