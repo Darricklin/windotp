@@ -117,3 +117,43 @@ func TestMatchProfileRejectsMissingAndAmbiguousMatches(t *testing.T) {
 		t.Fatal("ambiguous match unexpectedly succeeded")
 	}
 }
+
+func TestMatchesProfile(t *testing.T) {
+	tests := []struct {
+		name    string
+		match   string
+		sources []string
+		want    bool
+	}{
+		{name: "selected tab", match: "jump-bj.sensetime.com", sources: []string{"WindTerm", "jump-bj.sensetime.com"}, want: true},
+		{name: "case insensitive", match: "JUMP-BJ", sources: []string{"jump-bj.sensetime.com"}, want: true},
+		{name: "different tab", match: "jump-bj", sources: []string{"jump-sh.sensetime.com"}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := matchesProfile(tt.match, tt.sources); got != tt.want {
+				t.Fatalf("matchesProfile(%q, %q) = %v, want %v", tt.match, tt.sources, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTriggerValidatesArguments(t *testing.T) {
+	t.Setenv("WINDOTP_CONFIG", t.TempDir()+"/config.json")
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "missing profile", args: []string{"trigger"}},
+		{name: "negative delay", args: []string{"trigger", "--delay=-1ms", "prod"}},
+		{name: "invalid minimum validity", args: []string{"trigger", "--min-validity=30s", "prod"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := app{stdin: strings.NewReader(""), stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, store: memoryStore{}}
+			if err := a.run(tt.args); err == nil {
+				t.Fatalf("run(%q) unexpectedly succeeded", tt.args)
+			}
+		})
+	}
+}

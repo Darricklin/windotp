@@ -5,9 +5,16 @@ WindOTP 是为下面这个固定场景设计的 macOS 命令行工具：
 - WindTerm 通过 SSH 登录 JumpServer
 - JumpServer 显示 `Please enter 6 digits.`
 - Google Authenticator 使用标准 6 位 TOTP
-- 按一个快捷键生成、填写并提交验证码
+- 支持 WindTerm 检测提示后自动填写，也支持按快捷键填写
 
 Base32 密钥只存放在 macOS Keychain 中。配置文件仅保存 profile 名称，不保存密钥。
+
+WindOTP 支持两种使用方式，可同时配置：
+
+- 自动填写：WindTerm Trigger 调用 `windotp trigger NAME`
+- 快捷键填写：Automator 快速操作调用 `windotp auto`
+
+两种方式共用同一套 profile、tab 绑定和 Keychain 密钥。
 
 ## 安装
 
@@ -55,17 +62,34 @@ WindOTP 故意不提供 `--secret VALUE`，因为命令行参数可能被 shell 
 windotp code jump1
 ```
 
-`windotp auto` 必须由下面的 Automator 快速操作调用。不要从 Terminal 手动调用，
-因为此时 Terminal 而不是 WindTerm 位于前台。
+`windotp trigger` 和 `windotp auto` 必须由 WindTerm Trigger 或下面的 Automator 快速操作调用。
+不要从 Terminal 手动调用，因为此时 Terminal 而不是 WindTerm 位于前台。
 
 首次输入时，macOS 可能要求 Automation 或 Accessibility 权限。按系统提示授权运行命令的
-Terminal 或 Automator，然后执行：
+WindTerm、Terminal 或 Automator，然后执行：
 
 ```bash
 windotp doctor
 ```
 
-## 设置快捷键
+## 方式一：WindTerm 自动填写
+
+WindTerm 的 Trigger 可以在检测到登录提示后自动运行 WindOTP，不需要按快捷键。为每个 session
+创建一个 Trigger：
+
+- Pattern: `Please enter 6 digits\.`
+- Action: Run App
+- App: `/opt/homebrew/bin/windotp`
+- Arguments: `trigger jump1`
+
+`jump1` 替换为该 session 对应的 profile；用 `command -v windotp` 确认实际安装路径。默认等待
+200ms，让 WindTerm 先处理完提示，再核对当前选中 tab 的绑定并填写验证码。可用
+`trigger --delay 500ms jump1` 调整等待时间。
+
+如果 Trigger 来自后台 tab，或当前 tab 与 profile 不匹配，WindOTP 会拒绝输入，避免把验证码发送到
+错误的 session。切换到对应 tab 后重新发起登录即可。
+
+## 方式二：快捷键填写
 
 使用 macOS 自带的 Automator。“快捷指令”的 Shell 操作运行在沙箱中，可能无法读取登录
 Keychain，因此不适合作为 WindOTP 的入口。
@@ -90,18 +114,6 @@ Keychain，因此不适合作为 WindOTP 的入口。
 实际使用时，看到 `Please enter 6 digits.` 后按快捷键即可。在 M5 Mac、WindTerm 和多个 profile
 的实际环境中，从按下快捷键到填写验证码约需 1 秒。
 
-## WindTerm Trigger 自动填写（可选）
-
-WindTerm 的 Trigger 支持匹配文本后运行外部程序。可创建 session 专属 Trigger：
-
-- Pattern: `Please enter 6 digits\.`
-- Action: Run App
-- App: `/opt/homebrew/bin/windotp`
-- Arguments: `type --delay 200ms jump1`
-
-自动 Trigger 只适合当前登录 session 位于前台的情况。如果多个 tab 同时登录，后台 tab 的
-Trigger 可能在前台 tab 输入验证码，因此多 session 环境推荐使用 `windotp auto` 快捷键模式。
-
 ## 命令
 
 ```text
@@ -113,6 +125,7 @@ windotp code [NAME]
 windotp type [--enter=true] [--min-validity=5s] [--delay=0] [NAME]
 windotp choose [--enter=true] [--min-validity=5s]
 windotp auto [--enter=true] [--min-validity=5s]
+windotp trigger [--enter=true] [--min-validity=5s] [--delay=200ms] NAME
 windotp remove NAME
 windotp doctor
 windotp version
