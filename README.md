@@ -113,7 +113,7 @@ WindTerm 中央弹出带输入框的图形化登录窗口时，使用 `windotp p
 保存后完全关闭旧 session，再重新打开。连接前事件会启动一次等待任务；MFA 弹窗出现后自动填写。
 安装路径必须以 `command -v windotp` 的输出为准。
 
-<img width="706" height="173" alt="image" src="https://github.com/user-attachments/assets/6b848bd0-5dfa-4eda-99ed-15ab972469a1" />
+<img width="350" height="174" alt="image" src="https://github.com/user-attachments/assets/5bf3fdd8-9e7d-484c-9f1a-80687d4f7c7b" />
 <img width="768" height="562" alt="image" src="https://github.com/user-attachments/assets/9af3577c-9f90-485b-b1ce-bf997259e2e2" />
 <img width="768" height="562" alt="image" src="https://github.com/user-attachments/assets/68e006a0-72b8-422e-9cff-9bf536e53b9d" />
 <img width="760" height="551" alt="image" src="https://github.com/user-attachments/assets/21ade9ad-0e23-4668-ae5c-5baece125dad" />
