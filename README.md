@@ -112,6 +112,10 @@ WindTerm 中央弹出带输入框的图形化登录窗口时，使用 `windotp p
 
 保存后完全关闭旧 session，再重新打开。连接前事件会启动一次等待任务；MFA 弹窗出现后自动填写。
 安装路径必须以 `command -v windotp` 的输出为准。
+<img width="560" height="224" alt="image" src="https://github.com/user-attachments/assets/790308d6-750b-41d9-a27c-f45ed55f498a" />
+<img width="768" height="562" alt="image" src="https://github.com/user-attachments/assets/9af3577c-9f90-485b-b1ce-bf997259e2e2" />
+<img width="768" height="562" alt="image" src="https://github.com/user-attachments/assets/68e006a0-72b8-422e-9cff-9bf536e53b9d" />
+<img width="760" height="551" alt="image" src="https://github.com/user-attachments/assets/21ade9ad-0e23-4668-ae5c-5baece125dad" />
 
 如果旧版本已经让 WindTerm 保存了过期 MFA，升级后需要在 `SSH > 验证 > 已保存自动认证`
 点击一次 `清除`，然后重新连接。账号和固定密码可以继续保存，只有 MFA 这一步必须保持未勾选；
